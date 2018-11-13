@@ -12,6 +12,10 @@ require 'slack-ruby-client'
 
 ## Values extracted from CODEBUILD_* ENV vars present in each CodeBuild
 # job container.
+def build_id
+  ENV['CODEBUILD_BUILD_ID']
+end
+
 def commit_hash
   ENV['CODEBUILD_RESOLVED_SOURCE_VERSION']
 end
@@ -21,7 +25,7 @@ def current_status
 end
 
 def project_code
-  ENV['CODEBUILD_BUILD_ID'].split(':').first
+  build_id.split(':').first
 end
 
 def trigger
@@ -30,8 +34,8 @@ def trigger
   ENV['CODEBUILD_WEBHOOK_TRIGGER'].to_s
 end
 
-def region
-  ENV['AWS_REGION']
+def git_repo
+  ENV['CODEBUILD_SOURCE_REPO_URL'].gsub(/\.git\z/, '')
 end
 
 ## Configuration values specific to CodeBuild Notifier. CB_ prefix is
@@ -50,8 +54,17 @@ def whitelisted_branches
   env_branch_names&.split(',') || %w[master release]
 end
 
+def region
+  ENV['AWS_REGION']
+end
+
 def cb_puts(message)
   puts "CODEBUILD NOTIFIER: #{message}"
+end
+
+def details_url
+  'https://console.aws.amazon.com/codesuite/codebuild/projects/' \
+  "#{project_code}/build/#{build_id}/log?region=#{region}"
 end
 
 non_pr_branches = whitelisted_branches.map do |branch_name|
@@ -59,7 +72,10 @@ non_pr_branches = whitelisted_branches.map do |branch_name|
 end
 whitelist = whitelisted_branches.join(', ')
 
-# webhook = 'https://hooks.slack.com/services/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'
+# extraction target:
+# DynamoClient, takes region, dynamo table name
+# methods need: trigger, commit_hash, project_code, current_status
+# errors need: non_pr_branches, whitelist
 dynamo_client = Aws::DynamoDB::Client.new(region: region)
 
 # If trigger is empty, this build was launched using the Retry command from
@@ -91,6 +107,7 @@ if trigger.empty?
   else
     existing_item = results.first
     source_id = existing_item['source_id']
+    source_ref = existing_item['source_ref']
   end
 else
   # We only want to track information for branches with open PRs, except for
@@ -110,6 +127,7 @@ else
   # multiple projects, for example, with different buildspec files for
   # different ruby versions, or for rspec vs cucumber.
   source_id = "#{project_code}:#{trigger}"
+  source_ref = trigger
 
   existing_item_response = dynamo_client.get_item(
     key: { 'source_id' => source_id },
@@ -141,10 +159,92 @@ dynamo_client.put_item(
   table_name: dynamo_table_name
 )
 
-# We assume this is getting executed from the git working directory
-# puts `git show #{ENV['CODEBUILD_RESOLVED_SOURCE_VERSION']}`
+unless old_status != current_status
+  cb_puts "Current status #{current_status} is same as last status." \
+          'Skipping slack notifications.'
+  exit
+end
 
-if old_status != current_status
-  committer_email = `git show -s --format='%aE'`.chomp
-  cb_puts committer_email
+## Extraction target: message formatter
+# gets 5 values from git
+# needs source_ref, current_status, git_repo, commit_hash, project_code
+git_info = `git show -s --format='%h|%aN|%aE|%cE|%s'`.chomp.split('|')
+
+short_hash      = git_info[0]
+author_name     = git_info[1]
+author_email    = git_info[2]
+committer_email = git_info[3]
+commit_subject  = git_info[4]
+
+def source_ref_link(source_ref)
+  url_path = if %r{\Apr/}.match?(source_ref)
+               "pull/#{source_ref[3..-1]}"
+             else
+               "tree/#{source_ref.gsub(%r{\Abranch/}, '')}"
+             end
+  "<#{git_repo}/#{url_path}|#{source_ref}>"
+end
+
+def slack_color
+  {
+    'FAILED' => 'danger',
+    'SUCCEEDED' => 'good'
+  }[current_status]
+end
+
+def slack_icon
+  {
+    'FAILED' => ':broken_heart:',
+    'SUCCEEDED' => ':green_heart:'
+  }[current_status]
+end
+
+users_to_notify = [author_email, committer_email].uniq
+
+commit_link = "<#{git_repo}/commit/#{commit_hash}|#{short_hash}>"
+
+title = "#{slack_icon} #{author_name}'s " \
+        "<#{details_url}|#{project_code} build> - " \
+        "#{current_status.downcase}"
+message = "commit #{commit_link} (#{commit_subject}) in " \
+          "#{source_ref_link(source_ref)}"
+
+# extraction target:
+# Slack client. Pass in region, secrets_manager_slack_secret_name comes
+# from env.
+# Expose notify method that takes array of email addresses.
+secrets_client = Aws::SecretsManager::Client.new(region: region)
+secret = secrets_client.get_secret_value(
+  secret_id: secrets_manager_slack_secret_name
+)
+
+Slack.configure do |config|
+  config.token = JSON.parse(secret.secret_string)['token']
+end
+
+client = Slack::Web::Client.new
+
+users_to_notify.each do |email|
+  lookup_response = client.users_lookupByEmail(email: email)
+
+  unless lookup_response.ok
+    cb_puts "Slack user lookup by email for #{email} failed with " \
+            "error: #{lookup_response.error}"
+    next
+  end
+
+  slack_user_id = lookup_response.user.id
+
+  client.chat_postMessage(
+    as_user: true,
+    attachments: [
+      {
+        color: slack_color,
+        fallback: [title, message].join("\n"),
+        title: title,
+        text: message
+      }
+    ],
+    channel: slack_user_id
+  )
 end
