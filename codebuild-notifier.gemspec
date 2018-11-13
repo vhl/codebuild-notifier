@@ -14,6 +14,7 @@ Gem::Specification.new do |spec|
                      'for a given project, and sends slack notifications ' \
                      'when a branch/pr changes build status.'
   spec.homepage    = 'https://github.com/vhl/codebuild-notifier'
+  spec.executables = ['update-build-status']
 
   spec.files = `git ls-files -z`.split("\x0").reject do |file|
     file.match(%r{^(test|spec|features)/})
