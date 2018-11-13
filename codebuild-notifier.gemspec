@@ -14,6 +14,7 @@ Gem::Specification.new do |spec|
                      'for a given project, and sends slack notifications ' \
                      'when a branch/pr changes build status.'
   spec.homepage    = 'https://github.com/vhl/codebuild-notifier'
+  spec.executables = ['update-build-status']
 
   # Prevent pushing this gem to RubyGems.org by setting 'allowed_push_host', or
   # delete this section to allow pushing this gem to any host.
