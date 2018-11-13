@@ -1,0 +1,253 @@
+#!/usr/bin/env ruby
+
+require 'aws-sdk-dynamodb'
+require 'aws-sdk-secretsmanager'
+require 'slack-ruby-client'
+
+# This script updates a DynamoDb table with the last codebuild build status
+# for the current project and branch or pr. If the current build status is
+# different from the previous status, the email address of the author of the
+# last commit is extracted from the git commit, and a notification is sent
+# via slack.
+
+## Values extracted from CODEBUILD_* ENV vars present in each CodeBuild
+# job container.
+def build_id
+  ENV['CODEBUILD_BUILD_ID']
+end
+
+def commit_hash
+  ENV['CODEBUILD_RESOLVED_SOURCE_VERSION']
+end
+
+def current_status
+  ENV['CODEBUILD_BUILD_SUCCEEDING'].to_s == '1' ? 'SUCCEEDED' : 'FAILED'
+end
+
+def project_code
+  build_id.split(':').first
+end
+
+def trigger
+  # Uses .to_s to ensure consistent behaviour when ENV var does not exist,
+  # and when it exists but has no value.
+  ENV['CODEBUILD_WEBHOOK_TRIGGER'].to_s
+end
+
+def git_repo
+  ENV['CODEBUILD_SOURCE_REPO_URL'].gsub(/\.git\z/, '')
+end
+
+## Configuration values specific to CodeBuild Notifier. CB_ prefix is
+# used because ENV vars with CODEBUILD_ prefix are reserved for use by AWS.
+
+def dynamo_table_name
+  ENV['CB_NOTIFIER_DYNAMO_TABLE_NAME'] || 'branch-build-status'
+end
+
+def secrets_manager_slack_secret_name
+  ENV['CB_NOTIFIER_SLACK_SECRET_NAME'] || 'slack/codebuild'
+end
+
+def whitelisted_branches
+  env_branch_names = ENV['CB_NOTIFIER_NON_PULL_REQUEST_BRANCHES']
+  env_branch_names&.split(',') || %w[master release]
+end
+
+def region
+  ENV['AWS_REGION']
+end
+
+def cb_puts(message)
+  puts "CODEBUILD NOTIFIER: #{message}"
+end
+
+def details_url
+  'https://console.aws.amazon.com/codesuite/codebuild/projects/' \
+  "#{project_code}/build/#{build_id}/log?region=#{region}"
+end
+
+non_pr_branches = whitelisted_branches.map do |branch_name|
+  "branch/#{branch_name}"
+end
+whitelist = whitelisted_branches.join(', ')
+
+# extraction target:
+# DynamoClient, takes region, dynamo table name
+# methods need: trigger, commit_hash, project_code, current_status
+# errors need: non_pr_branches, whitelist
+dynamo_client = Aws::DynamoDB::Client.new(region: region)
+
+# If trigger is empty, this build was launched using the Retry command from
+# the console or api, so we don't have a pr or branch name in the env vars.
+# The commit hash and project code are used to find which pr or branch this
+# commit belongs to, and its previous status.
+if trigger.empty?
+  query_response = dynamo_client.query(
+    expression_attribute_values: {
+      ':commit_hash' => commit_hash,
+      ':project_code' => project_code
+    },
+    filter_expression: 'project_code = :project_code',
+    index_name: 'commit_hash_index',
+    key_condition_expression: 'commit_hash = :commit_hash',
+    table_name: dynamo_table_name
+  )
+  results = query_response.items
+  # Whenever a build is triggered by a PR or whitelisted branch, we update
+  # the record for that trigger with the commit hash. If a build is then
+  # launched using Retry, the status is updated, and notifications sent,
+  # only if the re-tried build was for the latest commit. Otherwise re-trying
+  # an older commit could result in inaccurate notifications.
+  if results.empty?
+    cb_puts "Commit #{commit_hash} in project #{project_code} did not match " \
+            'the most recent commit for any Pull Requests or the whitelisted ' \
+            "branches: #{whitelist}. Skipping status updates."
+    exit
+  else
+    existing_item = results.first
+    source_id = existing_item['source_id']
+    source_ref = existing_item['source_ref']
+  end
+else
+  # We only want to track information for branches with open PRs, except for
+  # master and release branches.
+  unless non_pr_branches.include?(trigger) || trigger =~ %r{^pr/}
+    cb_puts 'Build is neither for a Pull Request nor for one of whitelisted ' \
+            "branches: #{whitelist}. Skipping status updates."
+    exit
+  end
+
+  # source_id, the primary key is a composite of project_code and
+  # webook_trigger.
+  # e.g.:
+  #   my-app_ruby2-4:branch/master
+  #   my-app_ruby2-3:pr/4056
+  # project_code forms part of the key to support having repos with
+  # multiple projects, for example, with different buildspec files for
+  # different ruby versions, or for rspec vs cucumber.
+  source_id = "#{project_code}:#{trigger}"
+  source_ref = trigger
+
+  existing_item_response = dynamo_client.get_item(
+    key: { 'source_id' => source_id },
+    table_name: dynamo_table_name
+  )
+  existing_item = existing_item_response.item
+end
+
+old_status = existing_item && existing_item['status']
+
+# Update record for this project + branch/pr in DynamoDb even if the
+# status hasn't changed, so the latest commit hash is stored.
+new_item = {
+  commit_hash: commit_hash,
+  project_code: project_code,
+  source_id: source_id,
+  status: current_status
+}.tap do |memo|
+  # If launched via manual re-try instead of via a webhook, we don't want
+  # to overwrite the current source_ref value that tells us which branch or
+  # pull request originally created the dynamo record.
+  memo[:source_ref] = trigger if trigger != ''
+end
+
+cb_puts "Updating dynamo table #{dynamo_table_name} with: #{new_item.inspect}"
+
+dynamo_client.put_item(
+  item: new_item,
+  table_name: dynamo_table_name
+)
+
+if old_status == current_status
+  cb_puts "Current status #{current_status} is same as last status." \
+          'Skipping slack notifications.'
+  exit
+end
+
+## Extraction target: message formatter
+# gets 5 values from git
+# needs source_ref, current_status, git_repo, commit_hash, project_code
+git_info = `git show -s --format='%h|%aN|%aE|%cE|%s'`.chomp.split('|')
+
+short_hash, author_name, author_email, committer_email, commit_subject = git_info
+
+def source_ref_link(source_ref)
+  url_path = if %r{\Apr/}.match?(source_ref)
+               "pull/#{source_ref[3..-1]}"
+             else
+               "tree/#{source_ref.gsub(%r{\Abranch/}, '')}"
+             end
+  "<#{git_repo}/#{url_path}|#{source_ref}>"
+end
+
+def slack_color
+  {
+    'FAILED' => 'danger',
+    'SUCCEEDED' => 'good'
+  }[current_status]
+end
+
+def slack_icon
+  {
+    'FAILED' => ':broken_heart:',
+    'SUCCEEDED' => ':green_heart:'
+  }[current_status]
+end
+
+users_to_notify = [author_email, committer_email].uniq
+
+commit_link = "<#{git_repo}/commit/#{commit_hash}|#{short_hash}>"
+
+title = "#{slack_icon} #{author_name}'s " \
+        "<#{details_url}|#{project_code} build> - " \
+        "#{current_status.downcase}"
+message = "commit #{commit_link} (#{commit_subject}) in " \
+          "#{source_ref_link(source_ref)}"
+
+# extraction target:
+# Slack client. Pass in region, secrets_manager_slack_secret_name comes
+# from env.
+# Expose notify method that takes array of email addresses.
+
+secrets_client = Aws::SecretsManager::Client.new(region: region)
+secret = secrets_client.get_secret_value(
+  secret_id: secrets_manager_slack_secret_name
+)
+
+app_token = JSON.parse(secret.secret_string)['token']
+Slack.configure do |config|
+  config.token = app_token
+end
+
+# If the app token starts with xoxb- then it is a Bot User Oauth token
+# and slack notifications should be posted with as_user: true. If it
+# starts with xoxp- then it's an app token not associated with a user,
+# and as_user: should be false.
+is_bot_user = /\Axoxb/.match?(app_token)
+
+slack_client = Slack::Web::Client.new
+
+users_to_notify.each do |email|
+  lookup_response = slack_client.users_lookupByEmail(email: email)
+
+  if lookup_response.ok
+    slack_user_id = lookup_response.user.id
+
+    slack_client.chat_postMessage(
+      as_user: is_bot_user,
+      attachments: [
+        {
+          color: slack_color,
+          fallback: [title, message].join("\n"),
+          title: title,
+          text: message
+        }
+      ],
+      channel: slack_user_id
+    )
+  else
+    cb_puts "Slack user lookup by email for #{email} failed with " \
+            "error: #{lookup_response.error}"
+  end
+end
