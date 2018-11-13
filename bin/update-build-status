@@ -46,7 +46,7 @@ def dynamo_table_name
 end
 
 def secrets_manager_slack_secret_name
-  ENV['CB_NOTIFIER_SLACK_SECRET_NAME'] || 'slack/code-build'
+  ENV['CB_NOTIFIER_SLACK_SECRET_NAME'] || 'slack/codebuild'
 end
 
 def whitelisted_branches
@@ -142,7 +142,7 @@ old_status = existing_item && existing_item['status']
 # status hasn't changed, so the latest commit hash is stored.
 new_item = {
   commit_hash: commit_hash,
-  project: project_code,
+  project_code: project_code,
   source_id: source_id,
   status: current_status
 }.tap do |memo|
@@ -159,7 +159,7 @@ dynamo_client.put_item(
   table_name: dynamo_table_name
 )
 
-unless old_status != current_status
+if old_status == current_status
   cb_puts "Current status #{current_status} is same as last status." \
           'Skipping slack notifications.'
   exit
@@ -170,11 +170,7 @@ end
 # needs source_ref, current_status, git_repo, commit_hash, project_code
 git_info = `git show -s --format='%h|%aN|%aE|%cE|%s'`.chomp.split('|')
 
-short_hash      = git_info[0]
-author_name     = git_info[1]
-author_email    = git_info[2]
-committer_email = git_info[3]
-commit_subject  = git_info[4]
+short_hash, author_name, author_email, committer_email, commit_subject = git_info
 
 def source_ref_link(source_ref)
   url_path = if %r{\Apr/}.match?(source_ref)
@@ -213,38 +209,45 @@ message = "commit #{commit_link} (#{commit_subject}) in " \
 # Slack client. Pass in region, secrets_manager_slack_secret_name comes
 # from env.
 # Expose notify method that takes array of email addresses.
+
 secrets_client = Aws::SecretsManager::Client.new(region: region)
 secret = secrets_client.get_secret_value(
   secret_id: secrets_manager_slack_secret_name
 )
 
+app_token = JSON.parse(secret.secret_string)['token']
 Slack.configure do |config|
-  config.token = JSON.parse(secret.secret_string)['token']
+  config.token = app_token
 end
 
-client = Slack::Web::Client.new
+# If the app token starts with xoxb- then it is a Bot User Oauth token
+# and slack notifications should be posted with as_user: true. If it
+# starts with xoxp- then it's an app token not associated with a user,
+# and as_user: should be false.
+is_bot_user = /\Axoxb/.match?(app_token)
+
+slack_client = Slack::Web::Client.new
 
 users_to_notify.each do |email|
-  lookup_response = client.users_lookupByEmail(email: email)
+  lookup_response = slack_client.users_lookupByEmail(email: email)
 
-  unless lookup_response.ok
+  if lookup_response.ok
+    slack_user_id = lookup_response.user.id
+
+    slack_client.chat_postMessage(
+      as_user: is_bot_user,
+      attachments: [
+        {
+          color: slack_color,
+          fallback: [title, message].join("\n"),
+          title: title,
+          text: message
+        }
+      ],
+      channel: slack_user_id
+    )
+  else
     cb_puts "Slack user lookup by email for #{email} failed with " \
             "error: #{lookup_response.error}"
-    next
   end
-
-  slack_user_id = lookup_response.user.id
-
-  client.chat_postMessage(
-    as_user: true,
-    attachments: [
-      {
-        color: slack_color,
-        fallback: [title, message].join("\n"),
-        title: title,
-        text: message
-      }
-    ],
-    channel: slack_user_id
-  )
 end

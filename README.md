@@ -27,7 +27,7 @@ Reports status of AWS CodeBuild CI jobs to slack.
 ```
 
 ### A secret in AWS Secrets Manager:
- - expected to be named 'slack/code-build', but can be configured
+ - expected to be named 'slack/codebuild', but can be configured
  - contents should be:
 ```json
    { "token": "xoxo-your-slack-app-token" }
