@@ -27,9 +27,14 @@ Gem::Specification.new do |spec|
     file.match(%r{^(test|spec|features)/})
   end
 
+  spec.add_dependency 'activesupport', '> 2.0', '< 6.0'
   spec.add_dependency 'aws-sdk-dynamodb', '~> 1.16'
   spec.add_dependency 'aws-sdk-secretsmanager', '~> 1.19'
+  spec.add_dependency 'hashie', '> 1.0', '< 4.0'
   spec.add_dependency 'slack-ruby-client', '~> 0.13'
 
+  spec.add_development_dependency 'rspec', '~> 3.8'
   spec.add_development_dependency 'rubocop', '0.58.2'
+  spec.add_development_dependency 'rubocop-rspec', '1.30.0'
+  spec.add_development_dependency 'simplecov', '~> 0.16'
 end
