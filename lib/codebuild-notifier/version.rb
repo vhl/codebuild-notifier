@@ -1,3 +1,3 @@
 module CodeBuildNotifier
-  VERSION = '0.1.11'
+  VERSION = '0.1.39'
 end

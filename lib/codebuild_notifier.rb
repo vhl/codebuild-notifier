@@ -1,0 +1,1 @@
+require 'codebuild-notifier'
