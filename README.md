@@ -165,7 +165,7 @@ phases:
       CBN_ADDITIONAL_CHANNEL
     </th>
     <td>
-      --additional-channel
+      <nobr>--additional-channel</nobr>
     </td>
     <td>
       not set
@@ -178,10 +178,41 @@ phases:
   </tr>
   <tr>
     <th>
+      CBN_AWS_REGION
+    </th>
+    <td>
+      <nobr>--region</nobr>
+    </td>
+    <td>
+      value of AWS_REGION env var in CodeBuild container
+    </td>
+    <td>
+      If for some reason the dynamo table and secrets-manager live in a
+      different region than where CodeBuild is executing, you can specify
+      that region.
+    </td>
+  </tr>
+  <tr>
+    <th>
+      CBN_DYNAMO_TABLE
+    </th>
+    <td>
+      <nobr>--dynamo-table</nobr>
+    </td>
+    <td>
+      branch-build-status
+    </td>
+    <td>
+      This table must be created and permissions granted to it as described
+      in <a href="#infrastructure-requirements">Infrastructure Requirements</a>
+    </td>
+  </tr>
+  <tr>
+    <th>
       CBN_SLACK_ADMIN_USERNAMES
     </th>
     <td>
-      --slack-admin-usernames
+      <nobr>--slack-admin-usernames</nobr>
     </td>
     <td>
       not set
@@ -196,25 +227,10 @@ phases:
   </tr>
   <tr>
     <th>
-      CBN_DYNAMO_TABLE
-    </th>
-    <td>
-      --dynamo-table
-    </td>
-    <td>
-      branch-build-status
-    </td>
-    <td>
-      This table must be created and permissions granted to it as described
-      in <a href="#infrastructure-requirements">Infrastructure Requirements</a>
-    </td>
-  </tr>
-  <tr>
-    <th>
       CBN_SLACK_SECRET_NAME
     </th>
     <td>
-      --slack-secret-name
+      <nobr>--slack-secret-name</nobr>
     </td>
     <td>
       slack/codebuild
@@ -228,7 +244,7 @@ phases:
       CBN_WHITELIST_BRANCHES
     </th>
     <td>
-      --whitelist-branches
+      <nobr>--whitelist-branches</nobr>
     </td>
     <td>
       master,release
@@ -240,22 +256,6 @@ phases:
       regardless of Pull Request status.<br />
       Separate multiple values with commas, without spaces.<br />
       e.g. 'master,nightly,jira-50012'
-    </td>
-  </tr>
-  <tr>
-    <th>
-      CBN_AWS_REGION
-    </th>
-    <td>
-      --region
-    </td>
-    <td>
-      value of AWS_REGION env var in CodeBuild container
-    </td>
-    <td>
-      If for some reason the dynamo table and secrets-manager live in a
-      different region than where CodeBuild is executing, you can specify
-      that region.
     </td>
   </tr>
 </table>
