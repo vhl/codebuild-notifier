@@ -24,6 +24,10 @@ module CodeBuildNotifier
       [author_email, committer_email].uniq
     end
 
+    def additional_channel
+      !build.for_pr? && config.additional_channel
+    end
+
     private def git_info
       Git.current_commit
     end

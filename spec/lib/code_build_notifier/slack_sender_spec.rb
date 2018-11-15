@@ -31,6 +31,7 @@ describe CodeBuildNotifier::SlackSender do
   let(:slack_message) do
     instance_double(
       CodeBuildNotifier::SlackMessage,
+      additional_channel: false,
       payload: payload,
       recipients: [author_email]
     )
@@ -63,6 +64,30 @@ describe CodeBuildNotifier::SlackSender do
       described_class.new(config).send(slack_message)
 
       expect(Slack.config.token).to eq(app_auth_token)
+    end
+
+    context 'when the slack message specifies an additional channel' do
+      it 'posts a chat message to the specified channel' do
+        channel = '#target'
+        allow(slack_message).to receive(:additional_channel).and_return(channel)
+
+        described_class.new(config).send(slack_message)
+
+        expect(slack_client).to have_received(:chat_postMessage).with(
+          hash_including(attachments: [payload], channel: channel)
+        )
+      end
+
+      it 'prepends # to the channel if it does not start with #' do
+        channel = 'target'
+        allow(slack_message).to receive(:additional_channel).and_return(channel)
+
+        described_class.new(config).send(slack_message)
+
+        expect(slack_client).to have_received(:chat_postMessage).with(
+          hash_including(attachments: [payload], channel: "##{channel}")
+        )
+      end
     end
 
     it 'looks up the slack user id for the email address of each recipient' do
