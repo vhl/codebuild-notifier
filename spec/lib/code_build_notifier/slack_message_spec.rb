@@ -51,6 +51,33 @@ describe CodeBuildNotifier::SlackMessage do
     end
   end
 
+  describe '#additional_channel' do
+    it 'returns false if build is for a Pull Request' do
+      allow(build).to receive(:for_pr?).and_return(true)
+
+      expect(message.additional_channel).to be_falsey
+    end
+
+    context 'when the build is not for a Pull Request,' do
+      before do
+        allow(build).to receive(:for_pr?).and_return(false)
+      end
+
+      it 'is falsey if no additional channel is set in the config' do
+        allow(config).to receive(:additional_channel).and_return(nil)
+
+        expect(message.additional_channel).to be_falsey
+      end
+
+      it 'returns the additional channel in the config is one is set' do
+        channel = '#mychannel'
+        allow(config).to receive(:additional_channel).and_return(channel)
+
+        expect(message.additional_channel).to eq(channel)
+      end
+    end
+  end
+
   describe '#payload' do
     before do
       allow(CodeBuildNotifier::Git).to receive(:current_commit).and_return(
