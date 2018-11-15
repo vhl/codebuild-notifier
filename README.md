@@ -162,6 +162,22 @@ phases:
   </tr>
   <tr>
     <th>
+      CBN_ADDITIONAL_CHANNEL
+    </th>
+    <td>
+      --additional-channel
+    </td>
+    <td>
+      not set
+    </td>
+    <td>
+      If whitelist branches are set, status notifications for these
+      branches can be sent to this channel, as well as direct messages
+      to the author/committer of the commit triggering the build.
+    </td>
+  </tr>
+  <tr>
+    <th>
       CBN_SLACK_ADMIN_USERNAMES
     </th>
     <td>
@@ -171,9 +187,11 @@ phases:
       not set
     </td>
     <td>
-      If no slack user can be found in your workspace with the email address of the author or committer of a commit, a message will be sent to the slack usernames specified.
-
-    Separate multiple values with commas, with no spaces. e.g. fred,velma
+      If no slack user can be found in your workspace with the email
+      address of the author or committer of a commit, a message will be
+      sent to the slack usernames specified.<br />
+      Separate multiple values with commas, with no spaces.<br />
+      e.g. fred,velma
     </td>
   </tr>
   <tr>
@@ -187,7 +205,8 @@ phases:
       branch-build-status
     </td>
     <td>
-      This table must be created and permissions granted to it as described in <a href="#infrastructure-requirements">Infrastructure Requirements</a>
+      This table must be created and permissions granted to it as described
+      in <a href="#infrastructure-requirements">Infrastructure Requirements</a>
     </td>
   </tr>
   <tr>
@@ -215,9 +234,12 @@ phases:
       master,release
     </td>
     <td>
-      Normally statuses will be stored and notifications sent only for builds triggered by commits to branches with open Pull Requests. However, it can be useful to get notifications for all commits to certain branches, regardless of Pull Request status.
-
-    Separate multiple values with commas, without spaces. e.g. 'master,nightly,jira-50012'
+      Normally statuses will be stored and notifications sent only for builds
+      triggered by commits to branches with open Pull Requests. However, it
+      can be useful to get notifications for all commits to certain branches,
+      regardless of Pull Request status.<br />
+      Separate multiple values with commas, without spaces.<br />
+      e.g. 'master,nightly,jira-50012'
     </td>
   </tr>
   <tr>
@@ -231,7 +253,9 @@ phases:
       value of AWS_REGION env var in CodeBuild container
     </td>
     <td>
-      If for some reason the dynamo table and secrets-manager live in a different region than where CodeBuild is executing, you can specify that region.
+      If for some reason the dynamo table and secrets-manager live in a
+      different region than where CodeBuild is executing, you can specify
+      that region.
     </td>
   </tr>
 </table>

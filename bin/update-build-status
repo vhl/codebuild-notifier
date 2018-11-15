@@ -35,27 +35,34 @@ end
 
 command_line_opts = {}
 
+# rubocop:disable Metrics/BlockLength
 OptionParser.new do |opts|
   opts.banner = 'Usage: update-build-status [OPTIONS]'
 
   opts.on(
-    '--slack-admin-usernames=USERNAMES',
+    '--additional-channel=CHANNEL',
+    'status notifications for whitelisted branches will be sent here ' \
+    'as well as to author/committer'
+  ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
+
+  opts.on(
+    '--slack-admin-usernames=USERS',
     'comma-separated list of slack users to be notified if build status ' \
     'notifications fail to send'
   ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
 
   opts.on(
-    '--dynamo-table=TABLENAME',
+    '--dynamo-table=TABLE',
     'table for storing build statuses'
   ) { |table| command_line_opts[:dynamo_table] = table }
 
   opts.on(
-    '--slack-secret-name=SECRETNAME',
+    '--slack-secret-name=SECRET',
     'name of Secrets Manager secret with slack app/bot auth token'
   ) { |slack_secret| command_line_opts[:slack_secret_name] = slack_secret }
 
   opts.on(
-    '--whitelist-branches=BRANCHNAMES',
+    '--whitelist-branches=BRANCHES',
     'comma-separated list of branches that will have build notifications ' \
     'sent even if there is no open Pull Request'
   ) { |whitelist| command_line_opts[:whitelist_branches] = whitelist }
@@ -64,6 +71,7 @@ OptionParser.new do |opts|
     command_line_opts[:region] = region
   end
 end.parse!
+# rubocop:enable Metrics/BlockLength
 
 config = CodeBuildNotifier::Config.new(command_line_opts)
 build = CodeBuildNotifier::CurrentBuild.new
