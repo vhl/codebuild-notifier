@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'codebuild-notifier'
-
+require 'optparse'
 # This script updates a DynamoDb table with the last codebuild build status
 # for the current project and branch or pr. If the current build status is
 # different from the previous status, the email address of the author of the
@@ -33,7 +33,39 @@ def no_status_diff_message(build)
   'Skipping slack notifications.'
 end
 
-config = CodeBuildNotifier::Config.new
+command_line_opts = {}
+
+OptionParser.new do |opts|
+  opts.banner = 'Usage: update-build-status [OPTIONS]'
+
+  opts.on(
+    '--slack-admin-usernames=USERNAMES',
+    'comma-separated list of slack users to be notified if build status ' \
+    'notifications fail to send'
+  ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
+
+  opts.on(
+    '--dynamo-table=TABLENAME',
+    'table for storing build statuses'
+  ) { |table| command_line_opts[:dynamo_table] = table }
+
+  opts.on(
+    '--slack-secret-name=SECRETNAME',
+    'name of Secrets Manager secret with slack app/bot auth token'
+  ) { |slack_secret| command_line_opts[:slack_secret_name] = slack_secret }
+
+  opts.on(
+    '--whitelist-branches=BRANCHNAMES',
+    'comma-separated list of branches that will have build notifications ' \
+    'sent even if there is no open Pull Request'
+  ) { |whitelist| command_line_opts[:whitelist_branches] = whitelist }
+
+  opts.on('--region=REGION', 'AWS region') do |region|
+    command_line_opts[:region] = region
+  end
+end.parse!
+
+config = CodeBuildNotifier::Config.new(command_line_opts)
 build = CodeBuildNotifier::CurrentBuild.new
 history = CodeBuildNotifier::BuildHistory.new(config, build)
 
