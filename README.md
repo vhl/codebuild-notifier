@@ -248,6 +248,24 @@ phases:
   </tr>
   <tr>
     <th>
+      CBN_NOTIFY_EVERY_BUILD_BRANCHES
+    </th>
+    <td>
+      <nobr>--notify-every-build-branches</nobr>
+    </td>
+    <td>
+      not set
+    </td>
+    <td>
+      Allows overriding default notify strategy.
+      Branches specified will have notifications sent for every commit,
+      regardless of build status or previous build status.
+      Separate multiple values with commas, without spaces.<br />
+      e.g. 'master,nightly,jira-50012'
+    </td>
+  </tr>
+  <tr>
+    <th>
       CBN_SLACK_SECRET_NAME
     </th>
     <td>
