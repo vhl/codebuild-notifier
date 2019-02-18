@@ -63,15 +63,22 @@ OptionParser.new do |opts|
   ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
 
   opts.on(
-    '--slack-admin-usernames=USERS',
-    'comma-separated list of slack users to be notified if build status ' \
-    'notifications fail to send'
-  ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
+    '--default-notify-strategy=STRATEGY',
+    'when to send notifications, in the absence of a branch-specific ' \
+    'override -- valid options are: status_change (the default), ' \
+    'every_build, every_failure_and_status_change'
+  ) { |default_strategy| command_line_opts[:default_strategy] = default_strategy }
 
   opts.on(
     '--dynamo-table=TABLE',
     'table for storing build statuses'
   ) { |table| command_line_opts[:dynamo_table] = table }
+
+  opts.on(
+    '--slack-admin-usernames=USERS',
+    'comma-separated list of slack users to be notified if build status ' \
+    'notifications fail to send'
+  ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
 
   opts.on(
     '--slack-secret-name=SECRET',
@@ -122,7 +129,13 @@ history.write_entry(source_id) do |new_item|
   cb_puts "Updating dynamo table #{config.dynamo_table} with: #{new_item}"
 end
 
-quit(no_status_diff_message(build)) if last_build&.status == build.status
+status_changed = last_build&.status != build.status
+if config.default_strategy == 'status_change'
+  quit(no_status_diff_message(build)) unless status_changed
+elsif config.default_strategy == 'fail_or_status_change'
+  # TODO: Find good wording for a different exit message for this case.
+  quit(no_status_diff_message(build)) if build.status == 'SUCCEEDED' && !status_changed
+end
 
 slack_message = CodeBuildNotifier::SlackMessage.new(build, config, source_ref)
 sender = CodeBuildNotifier::SlackSender.new(config)

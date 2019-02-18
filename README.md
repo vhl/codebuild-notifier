@@ -194,6 +194,27 @@ phases:
   </tr>
   <tr>
     <th>
+      CBN_DEFAULT_NOTIFY_STRATEGY
+    </th>
+    <td>
+      <nobr>--default-notify-strategy</nobr>
+    </td>
+    <td>
+      fail_or_status_change
+    </td>
+    <td>
+      Determines when notifications will be sent.
+      'status_change' sends notifications for the first build in a PR or
+      whitelisted branch, thereafter if a build in that PR/branch has a
+      different status to the previous build.
+      'every_build' sends a notification regardless of status.
+      'fail_or_status_change', the default value, will send if the status
+      changes, but will also send notifications of every failure,
+      regardless of previous status.
+    </td>
+  </tr>
+  <tr>
+    <th>
       CBN_DYNAMO_TABLE
     </th>
     <td>

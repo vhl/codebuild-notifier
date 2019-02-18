@@ -18,6 +18,9 @@ Style/Documentation:
 Style/FrozenStringLiteralComment:
   Enabled: false
 
+Style/AsciiComments:
+  Enabled: false
+
 Style/AccessModifierDeclarations:
   EnforcedStyle: inline
 
