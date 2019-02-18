@@ -75,6 +75,13 @@ OptionParser.new do |opts|
   ) { |table| command_line_opts[:dynamo_table] = table }
 
   opts.on(
+    '--notify-every-build-branches=BRANCHES',
+    'allows branch-specific override for default notify strategy; ' \
+    'comma-separated list of branches that will have build notifications ' \
+    'sent for every build, regardless of previous build status'
+  ) { |branches| command_line_opts[:notify_every_build_branches] = branches }
+
+  opts.on(
     '--slack-admin-usernames=USERS',
     'comma-separated list of slack users to be notified if build status ' \
     'notifications fail to send'
@@ -130,11 +137,13 @@ history.write_entry(source_id) do |new_item|
 end
 
 status_changed = last_build&.status != build.status
-if config.default_strategy == 'status_change'
-  quit(no_status_diff_message(build)) unless status_changed
-elsif config.default_strategy == 'fail_or_status_change'
-  # TODO: Find good wording for a different exit message for this case.
-  quit(no_status_diff_message(build)) if build.status == 'SUCCEEDED' && !status_changed
+unless config.notify_every_build_branch_ids.include?(build.trigger)
+  if config.default_strategy == 'status_change'
+    quit(no_status_diff_message(build)) unless status_changed
+  elsif config.default_strategy == 'fail_or_status_change'
+    # TODO: Find good wording for a different exit message for this case.
+    quit(no_status_diff_message(build)) if build.status == 'SUCCEEDED' && !status_changed
+  end
 end
 
 slack_message = CodeBuildNotifier::SlackMessage.new(build, config, source_ref)
