@@ -7,10 +7,12 @@ describe CodeBuildNotifier::BuildHistory do
   let(:source_id) { "#{project_code}:#{trigger}" }
   let(:status) { 'FAILED' }
   let(:trigger) { 'branch/my_branch' }
+  let(:branch_name) { 'my_branch' }
 
   let(:build) do
     instance_double(
       CodeBuildNotifier::CurrentBuild,
+      branch_name: branch_name,
       commit_hash: commit_hash,
       launched_by_retry?: false,
       project_code: project_code,
@@ -61,7 +63,20 @@ describe CodeBuildNotifier::BuildHistory do
     it 'sets an update expression by joining the keys to be updated' do
       history.write_entry(source_id) do |updates|
         expect(updates[:update_expression]).to eq(
-          'SET #commit_hash = :commit_hash, #project_code = :project_code, ' \
+          'SET #commit_hash = :commit_hash, ' \
+          '#project_code = :project_code, ' \
+          '#status = :status, #source_ref = :source_ref, ' \
+          '#branch_name = :branch_name'
+        )
+      end
+    end
+
+    it 'it does not set branch name if it is blank' do
+      allow(build).to receive(:branch_name).and_return('')
+      history.write_entry(source_id) do |updates|
+        expect(updates[:update_expression]).to eq(
+          'SET #commit_hash = :commit_hash, ' \
+          '#project_code = :project_code, ' \
           '#status = :status, #source_ref = :source_ref'
         )
       end
@@ -71,10 +86,11 @@ describe CodeBuildNotifier::BuildHistory do
       history.write_entry(source_id) do |updates|
         expect(updates[:expression_attribute_names]).to eq(
           {
-            '#commit_hash'=>'commit_hash',
-            '#project_code'=>'project_code',
-            '#source_ref'=>'source_ref',
-            '#status'=>'status'
+            '#branch_name' => 'branch_name',
+            '#commit_hash' => 'commit_hash',
+            '#project_code' => 'project_code',
+            '#source_ref' => 'source_ref',
+            '#status' => 'status'
           }
         )
       end
@@ -98,6 +114,12 @@ describe CodeBuildNotifier::BuildHistory do
       it 'does not set a source ref attribute' do
         history.write_entry(source_id) do |updates|
           expect(updates[:expression_attribute_values]).not_to have_key(':source_ref')
+        end
+      end
+
+      it 'does not set a branch name attribute' do
+        history.write_entry(source_id) do |updates|
+          expect(updates[:expression_attribute_values]).not_to have_key(':branch_name')
         end
       end
     end

@@ -25,7 +25,7 @@ module CodeBuildNotifier
     attr_reader :config, :current_build
 
     delegate :dynamo_table, to: :config
-    delegate :launched_by_retry?, to: :current_build
+    delegate :branch_name, :launched_by_retry?, to: :current_build
 
     def initialize(config, current_build)
       @config = config
@@ -86,7 +86,10 @@ module CodeBuildNotifier
         # If launched via manual re-try instead of via a webhook, we don't
         # want to overwrite the current source_ref value that tells us which
         # branch or pull request originally created the dynamo record.
-        memo[:source_ref] = current_build.trigger unless launched_by_retry?
+        unless launched_by_retry?
+          memo[:source_ref] = current_build.trigger
+          memo[:branch_name] = branch_name unless branch_name.empty?
+        end
       end
     end
 
