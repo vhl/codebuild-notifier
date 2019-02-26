@@ -230,6 +230,25 @@ phases:
   </tr>
   <tr>
     <th>
+      CBN_OVERRIDE_NOTIFY_STRATEGY
+    </th>
+    <td>
+      <nobr>--override-notify-strategy</nobr>
+    </td>
+    <td>
+      not set
+    </td>
+    <td>
+      Allows overriding default notify strategy.
+      Specify a branch and strategy for that branch, with a colon separator.
+      Valid strategies are:
+      status_change, every_build, fail_or_status_change
+      Specify multiple branch strategies delimited by comma.
+      e.g. 'master:every_build,jira-15650:status_change'
+    </td>
+  </tr>
+  <tr>
+    <th>
       CBN_SLACK_ADMIN_USERNAMES
     </th>
     <td>
@@ -244,24 +263,6 @@ phases:
       sent to the slack usernames specified.<br />
       Separate multiple values with commas, with no spaces.<br />
       e.g. fred,velma
-    </td>
-  </tr>
-  <tr>
-    <th>
-      CBN_NOTIFY_EVERY_BUILD_BRANCHES
-    </th>
-    <td>
-      <nobr>--notify-every-build-branches</nobr>
-    </td>
-    <td>
-      not set
-    </td>
-    <td>
-      Allows overriding default notify strategy.
-      Branches specified will have notifications sent for every commit,
-      regardless of build status or previous build status.
-      Separate multiple values with commas, without spaces.<br />
-      e.g. 'master,nightly,jira-50012'
     </td>
   </tr>
   <tr>
