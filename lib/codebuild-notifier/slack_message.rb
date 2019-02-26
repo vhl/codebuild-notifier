@@ -18,12 +18,13 @@
 module CodeBuildNotifier
   class SlackMessage
     attr_reader :author_email, :author_name, :build, :committer_email,
-                :commit_message_subject, :config, :short_hash, :source_ref
+                :commit_message_subject, :config, :short_hash
 
-    def initialize(build, config, source_ref)
+    delegate :source_ref, to: :build
+
+    def initialize(build, config)
       @build = build
       @config = config
-      @source_ref = source_ref
       @short_hash, @author_name, @author_email,
         @committer_email, @commit_message_subject = git_info
     end
