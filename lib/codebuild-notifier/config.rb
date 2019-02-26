@@ -31,7 +31,7 @@ module CodeBuildNotifier
       region: ENV['CBN_AWS_REGION'] || ENV['AWS_REGION'],
       slack_admins: ENV['CBN_SLACK_ADMIN_USERNAMES'],
       slack_secret_name: ENV['CBN_SLACK_SECRET_NAME'] || 'slack/codebuild',
-      notify_every_build_branches: ENV['CBN_NOTIFY_EVERY_BUILD_BRANCHES'],
+      strategy_overrides: ENV['CBN_OVERRIDE_NOTIFY_STRATEGY'],
       whitelist_branches: ENV['CBN_WHITELIST_BRANCHES']
     )
       @additional_channel = additional_channel
@@ -40,25 +40,22 @@ module CodeBuildNotifier
       @region = region
       @slack_admins = slack_admins&.split(',') || []
       @slack_secret_name = slack_secret_name
-      @notify_every_build_branches = notify_every_build_branches&.split(',') || []
+      @strategy_overrides = strategy_overrides&.split(',') || []
       @whitelist_branches = whitelist_branches&.split(',') || DEFAULT_WHITELIST
     end
 
-    def notify_every_build_branch_ids
-      branch_ids(@notify_every_build_branches)
+    def strategy_for_branch(branch_name)
+      lookup = @strategy_overrides.map { |override| override.split(':') }.to_h
+      lookup.fetch(branch_name, default_strategy)
     end
 
+    # Match the format of the CodeBuild trigger variable
     def non_pr_branch_ids
-      branch_ids(whitelist_branches)
+      whitelist_branches.map { |name| "branch/#{name}" }
     end
 
     def whitelist
       whitelist_branches.join(', ')
-    end
-
-    # Match the format of the CodeBuild trigger variable
-    private def branch_ids(branches)
-      branches.map { |name| "branch/#{name}" }
     end
   end
 end

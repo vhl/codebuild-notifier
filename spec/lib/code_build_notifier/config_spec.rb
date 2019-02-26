@@ -37,6 +37,33 @@ describe CodeBuildNotifier::Config do
     end
   end
 
+  describe '#strategy_for_branch' do
+    let(:current_branch) { 'branch123' }
+
+    it 'returns the default strategy when no overrides are specified' do
+      config = described_class.new(strategy_overrides: nil)
+      result = config.strategy_for_branch(current_branch)
+      expect(result).to eq(config.default_strategy)
+    end
+
+    it 'returns the default strategy when no override matches the ' \
+       'current branch' do
+      config = described_class.new(strategy_overrides: 'other_branch:strategy')
+      result = config.strategy_for_branch(current_branch)
+      expect(result).to eq(config.default_strategy)
+    end
+
+    it 'returns the strategy specified by an override matching the current ' \
+       'branch' do
+      strategy = 'my_override_strategy'
+      config = described_class.new(
+        strategy_overrides: "#{current_branch}:#{strategy}"
+      )
+      result = config.strategy_for_branch(current_branch)
+      expect(result).to eq(strategy)
+    end
+  end
+
   describe '#non_pr_branch_ids' do
     it 'prepends each whitelist branch with "branch/"' do
       branches = %w[oak elm]
