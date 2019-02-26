@@ -11,6 +11,25 @@ describe CodeBuildNotifier::CurrentBuild do
     end
   end
 
+  describe '#branch_name' do
+    it 'returns empty string if head ref argument is nil' do
+      build = described_class.new(head_ref: nil)
+      expect(build.branch_name).to eq('')
+    end
+
+    it 'returns empty string if head ref argument is empty string' do
+      build = described_class.new(head_ref: '')
+      expect(build.branch_name).to eq('')
+    end
+
+    it 'returns the branch name without refs/heads prefix' do
+      branch = 'mae-12345'
+      ref = "refs/heads/#{branch}"
+      build = described_class.new(head_ref: ref)
+      expect(build.branch_name).to eq(branch)
+    end
+  end
+
   describe '#status' do
     it 'returns SUCCEEDED when status code is integer 1' do
       build = described_class.new(status_code: 1)

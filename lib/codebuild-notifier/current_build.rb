@@ -25,6 +25,7 @@ module CodeBuildNotifier
       build_id: ENV['CODEBUILD_BUILD_ID'],
       commit_hash: ENV['CODEBUILD_RESOLVED_SOURCE_VERSION'],
       git_repo: ENV['CODEBUILD_SOURCE_REPO_URL'],
+      head_ref: ENV['CODEBUILD_WEBHOOK_HEAD_REF'],
       status_code: ENV['CODEBUILD_BUILD_SUCCEEDING'],
       trigger: ENV['CODEBUILD_WEBHOOK_TRIGGER']
     )
@@ -32,8 +33,13 @@ module CodeBuildNotifier
       @commit_hash = commit_hash
       # Handle repos specified with and without optional .git suffix.
       @git_repo_url = git_repo.to_s.gsub(/\.git\z/, '')
+      @head_ref = head_ref
       @status_code = status_code
       @trigger = trigger
+    end
+
+    def branch_name
+      @head_ref.to_s.gsub(%r{^refs/heads/}, '')
     end
 
     def status
