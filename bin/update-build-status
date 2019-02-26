@@ -60,19 +60,25 @@ OptionParser.new do |opts|
     '--additional-channel=CHANNEL',
     'status notifications for whitelisted branches will be sent here ' \
     'as well as to author/committer'
-  ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
+  ) do |usernames|
+    command_line_opts[:slack_admin_users] = usernames
+  end
 
   opts.on(
     '--default-notify-strategy=STRATEGY',
     'when to send notifications, in the absence of a branch-specific ' \
     'override -- valid options are: status_change (the default), ' \
     'every_build, fail_or_status_change'
-  ) { |default_strategy| command_line_opts[:default_strategy] = default_strategy }
+  ) do |default_strategy|
+    command_line_opts[:default_strategy] = default_strategy
+  end
 
   opts.on(
     '--dynamo-table=TABLE',
     'table for storing build statuses'
-  ) { |table| command_line_opts[:dynamo_table] = table }
+  ) do |table|
+    command_line_opts[:dynamo_table] = table
+  end
 
   opts.on(
     '--override-notify-strategy=BRANCH_STRATEGY_PAIRS',
@@ -80,24 +86,32 @@ OptionParser.new do |opts|
     'Valid strategies are: status_change, every_build, fail_or_status_change ' \
     'separate pairs with a comma' \
     'e.g. master:every_build,jira-15650:status_change'
-  ) { |overrides| command_line_opts[:strategy_overrides] = overrides }
+  ) do |overrides|
+    command_line_opts[:strategy_overrides] = overrides
+  end
 
   opts.on(
     '--slack-admin-usernames=USERS',
     'comma-separated list of slack users to be notified if build status ' \
     'notifications fail to send'
-  ) { |usernames| command_line_opts[:slack_admin_users] = usernames }
+  ) do |usernames|
+    command_line_opts[:slack_admin_users] = usernames
+  end
 
   opts.on(
     '--slack-secret-name=SECRET',
     'name of Secrets Manager secret with slack app/bot auth token'
-  ) { |slack_secret| command_line_opts[:slack_secret_name] = slack_secret }
+  ) do |slack_secret|
+    command_line_opts[:slack_secret_name] = slack_secret
+  end
 
   opts.on(
     '--whitelist-branches=BRANCHES',
     'comma-separated list of branches that will have build notifications ' \
     'sent even if there is no open Pull Request'
-  ) { |whitelist| command_line_opts[:whitelist_branches] = whitelist }
+  ) do |whitelist|
+    command_line_opts[:whitelist_branches] = whitelist
+  end
 
   opts.on('--region=REGION', 'AWS region') do |region|
     command_line_opts[:region] = region
