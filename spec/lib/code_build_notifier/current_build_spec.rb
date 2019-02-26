@@ -1,4 +1,15 @@
 describe CodeBuildNotifier::CurrentBuild do
+  let(:previous_branch_name) { 'previous_branch' }
+  let(:previous_source_id) { 'previous:123' }
+  let(:previous_source_ref) { 'refs/previous' }
+  let(:previous_build) do
+    Hashie::Mash.new(
+      branch_name: previous_branch_name,
+      source_id: previous_source_id,
+      source_ref: previous_source_ref
+    )
+  end
+
   describe '#git_repo_url' do
     it 'removes .git from the end of a git repo specified with .git' do
       build = described_class.new(git_repo: 'https://my_host/my_repo.git')
@@ -12,21 +23,36 @@ describe CodeBuildNotifier::CurrentBuild do
   end
 
   describe '#branch_name' do
-    it 'returns empty string if head ref argument is nil' do
-      build = described_class.new(head_ref: nil)
-      expect(build.branch_name).to eq('')
+    context 'when launched by retry,' do
+      it 'returns nil if no previous build is set' do
+        build = described_class.new(trigger: nil)
+        expect(build.branch_name).to be_nil
+      end
+
+      it 'returns the branch_name of the previous build if one is set' do
+        build = described_class.new(trigger: nil)
+        build.previous_build = previous_build
+        expect(build.branch_name).to eq(previous_branch_name)
+      end
     end
 
-    it 'returns empty string if head ref argument is empty string' do
-      build = described_class.new(head_ref: '')
-      expect(build.branch_name).to eq('')
-    end
+    context 'when not launched by retry,' do
+      it 'returns empty string if head ref argument is nil' do
+        build = described_class.new(trigger: 'abc', head_ref: nil)
+        expect(build.branch_name).to eq('')
+      end
 
-    it 'returns the branch name without refs/heads prefix' do
-      branch = 'mae-12345'
-      ref = "refs/heads/#{branch}"
-      build = described_class.new(head_ref: ref)
-      expect(build.branch_name).to eq(branch)
+      it 'returns empty string if head ref argument is empty string' do
+        build = described_class.new(trigger: 'abc', head_ref: '')
+        expect(build.branch_name).to eq('')
+      end
+
+      it 'returns the branch name without refs/heads prefix' do
+        branch = 'mae-12345'
+        ref = "refs/heads/#{branch}"
+        build = described_class.new(trigger: 'abc', head_ref: ref)
+        expect(build.branch_name).to eq(branch)
+      end
     end
   end
 
@@ -90,12 +116,50 @@ describe CodeBuildNotifier::CurrentBuild do
   end
 
   describe '#source_id' do
-    it 'joins the project code and trigger with a colon' do
-      project_code = 'abc'
-      build_id = "#{project_code}:123"
-      build = described_class.new(build_id: build_id, trigger: 'pr/143')
+    context 'when launched by retry,' do
+      it 'returns nil if no previous build is set' do
+        build = described_class.new(trigger: nil)
+        expect(build.source_id).to be_nil
+      end
 
-      expect(build.source_id).to eq('abc:pr/143')
+      it 'returns the source_id of the previous build if one is set' do
+        build = described_class.new(trigger: nil)
+        build.previous_build = previous_build
+        expect(build.source_id).to eq(previous_source_id)
+      end
+    end
+
+    context 'when not launched by retry,' do
+      it 'joins the project code and trigger with a colon' do
+        project_code = 'abc'
+        build_id = "#{project_code}:123"
+        build = described_class.new(build_id: build_id, trigger: 'pr/143')
+
+        expect(build.source_id).to eq('abc:pr/143')
+      end
+    end
+  end
+
+  describe '#source_ref' do
+    context 'when launched by retry,' do
+      it 'returns nil if no previous build is set' do
+        build = described_class.new(trigger: nil)
+        expect(build.source_ref).to be_nil
+      end
+
+      it 'returns the source_ref of the previous build if one is set' do
+        build = described_class.new(trigger: nil)
+        build.previous_build = previous_build
+        expect(build.source_ref).to eq(previous_source_ref)
+      end
+    end
+
+    context 'when not launched by retry,' do
+      it 'returns the build trigger' do
+        build = described_class.new(trigger: 'pr/143')
+
+        expect(build.source_ref).to eq('pr/143')
+      end
     end
   end
 end

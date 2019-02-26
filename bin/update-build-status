@@ -109,6 +109,7 @@ build = CodeBuildNotifier::CurrentBuild.new
 history = CodeBuildNotifier::BuildHistory.new(config, build)
 
 last_build = history.last_entry
+build.previous_build = last_build
 
 if build.launched_by_retry?
   # Whenever a build is triggered by a PR or whitelisted branch, we update
@@ -117,22 +118,17 @@ if build.launched_by_retry?
   # only if the re-tried build was for the latest commit. Otherwise re-trying
   # an older commit could result in inaccurate notifications.
   quit(not_latest_commit_in_branch_message(build, config)) unless last_build
-
-  source_id = last_build.source_id
-  source_ref = last_build.source_ref
 else
   # We only want to track information for whitelisted branches and branches
   # with open Pull Requests.
   unless config.non_pr_branch_ids.include?(build.trigger) || build.for_pr?
     quit(not_pr_or_whitelisted_branch_message(config))
   end
-  source_id = build.source_id
-  source_ref = build.trigger
 end
 
 # Update record for this project + branch/pr in DynamoDb even if the
 # status hasn't changed, so the latest commit hash is stored.
-history.write_entry(source_id) do |new_item|
+history.write_entry(build.source_id) do |new_item|
   cb_puts "Updating dynamo table #{config.dynamo_table} with: #{new_item}"
 end
 
@@ -146,6 +142,6 @@ unless config.notify_every_build_branch_ids.include?(build.trigger)
   end
 end
 
-slack_message = CodeBuildNotifier::SlackMessage.new(build, config, source_ref)
+slack_message = CodeBuildNotifier::SlackMessage.new(build, config, build.source_ref)
 sender = CodeBuildNotifier::SlackSender.new(config)
 sender.send(slack_message)

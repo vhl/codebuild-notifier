@@ -18,6 +18,7 @@
 module CodeBuildNotifier
   class CurrentBuild
     attr_reader :build_id, :commit_hash, :git_repo_url, :status_code, :trigger
+    attr_accessor :previous_build
 
     # Default values are extracted from CODEBUILD_* ENV vars present in each
     # CodeBuild # job container.
@@ -38,8 +39,15 @@ module CodeBuildNotifier
       @trigger = trigger
     end
 
+    # If launched via retry, the webhook head ref env var is blank,
+    # but if the previous build for this branch has been located,
+    # the branch_name of that build is the same as for this build
     def branch_name
-      @head_ref.to_s.gsub(%r{^refs/heads/}, '')
+      if launched_by_retry?
+        previous_build&.branch_name
+      else
+        @head_ref.to_s.gsub(%r{^refs/heads/}, '')
+      end
     end
 
     def status
@@ -69,7 +77,25 @@ module CodeBuildNotifier
     # multiple projects, for example, with different buildspec files for
     # different ruby versions, or for rspec vs cucumber.
     def source_id
-      "#{project_code}:#{trigger}"
+      # If launched via retry, trigger is blank, but if the previous
+      # build for this branch has been located, the source_id of that
+      # build is the same as for this build
+      if launched_by_retry?
+        previous_build&.source_id
+      else
+        "#{project_code}:#{trigger}"
+      end
+    end
+
+    def source_ref
+      # If launched via retry, trigger is blank, but if the previous
+      # build for this branch has been located, the source_ref of that
+      # build is the same as for this build
+      if launched_by_retry?
+        previous_build&.source_ref
+      else
+        trigger
+      end
     end
   end
 end

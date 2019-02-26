@@ -20,6 +20,7 @@ describe CodeBuildNotifier::SlackMessage do
       commit_hash: commit_hash,
       git_repo_url: git_repo,
       project_code: project_code,
+      source_ref: source_ref,
       status: status
     )
   end
@@ -31,7 +32,7 @@ describe CodeBuildNotifier::SlackMessage do
     )
   end
 
-  let(:message) { described_class.new(build, config, source_ref) }
+  let(:message) { described_class.new(build, config) }
 
   describe '#recipients' do
     it 'returns author email and commiter email if they are different' do
@@ -113,7 +114,7 @@ describe CodeBuildNotifier::SlackMessage do
 
     it 'includes the source_ref specified on initialize in the fallback and ' \
        'text keys' do
-      message = described_class.new(build, config, source_ref)
+      message = described_class.new(build, config)
       expect(
         [message.payload[:fallback], message.payload[:text]]
       ).to all(include(source_ref))
@@ -165,9 +166,9 @@ describe CodeBuildNotifier::SlackMessage do
 
     context 'when the build is for a Pull Request,' do
       let(:pr_number) { '123' }
-      let(:message) { described_class.new(build, config, "pr/#{pr_number}") }
 
       it 'includes a link to the Pull Request in the fallback and text keys' do
+        allow(build).to receive(:source_ref).and_return("pr/#{pr_number}")
         expect(
           [message.payload[:fallback], message.payload[:text]]
         ).to all(include("#{git_repo}/pull/#{pr_number}"))
@@ -176,9 +177,9 @@ describe CodeBuildNotifier::SlackMessage do
 
     context 'when the build is for a branch,' do
       let(:branch) { 'my_branch' }
-      let(:message) { described_class.new(build, config, "branch/#{branch}") }
 
       it 'includes a link to the branch in the fallback and text keys' do
+        allow(build).to receive(:source_ref).and_return("branch/#{branch}")
         expect(
           [message.payload[:fallback], message.payload[:text]]
         ).to all(include("#{git_repo}/tree/#{branch}"))
