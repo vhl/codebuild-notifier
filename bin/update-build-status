@@ -160,6 +160,6 @@ unless strategy == 'every_build'
   end
 end
 
-slack_message = CodeBuildNotifier::SlackMessage.new(build, config, build.source_ref)
+slack_message = CodeBuildNotifier::SlackMessage.new(build, config)
 sender = CodeBuildNotifier::SlackSender.new(config)
 sender.send(slack_message)
