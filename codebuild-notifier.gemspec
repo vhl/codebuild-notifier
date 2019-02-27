@@ -30,6 +30,7 @@ Gem::Specification.new do |spec|
                      'run on AWS CodeBuild for each pr or whitelisted branch' \
                      'for a given project, and sends slack notifications ' \
                      'when a branch/pr changes build status.'
+  spec.licenses    = ['GPL-3.0+']
   spec.homepage    = 'https://github.com/vhl/codebuild-notifier'
   spec.executables = ['update-build-status']
 
