@@ -17,8 +17,12 @@
 
 module CodeBuildNotifier
   class CurrentBuild
-    attr_reader :build_id, :commit_hash, :git_repo_url, :status_code, :trigger
     attr_accessor :previous_build
+    attr_reader :build_id, :commit_hash, :git_repo_url, :status_code, :trigger
+
+    # attrs from git info
+    attr_reader :author_email, :author_name, :committer_email, :committer_name,
+                :commit_message_subject, :short_hash
 
     # Default values are extracted from CODEBUILD_* ENV vars present in each
     # CodeBuild # job container.
@@ -37,6 +41,10 @@ module CodeBuildNotifier
       @head_ref = head_ref
       @status_code = status_code
       @trigger = trigger
+
+      @short_hash, @author_name, @author_email,
+        @committer_name, @committer_email,
+        @commit_message_subject = git_info
     end
 
     # If launched via retry, the webhook head ref env var is blank,
@@ -96,6 +104,10 @@ module CodeBuildNotifier
       else
         trigger
       end
+    end
+
+    private def git_info
+      Git.current_commit
     end
   end
 end
