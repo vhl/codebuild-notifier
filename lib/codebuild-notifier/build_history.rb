@@ -78,11 +78,7 @@ module CodeBuildNotifier
     end
 
     private def new_entry
-      {
-        commit_hash: current_build.commit_hash,
-        project_code: current_build.project_code,
-        status: current_build.status
-      }.tap do |memo|
+      current_build.history_fields.tap do |memo|
         # If launched via manual re-try instead of via a webhook, we don't
         # want to overwrite the current source_ref value that tells us which
         # branch or pull request originally created the dynamo record.
