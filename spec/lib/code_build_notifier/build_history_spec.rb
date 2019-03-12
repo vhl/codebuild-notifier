@@ -9,6 +9,13 @@ describe CodeBuildNotifier::BuildHistory do
   let(:trigger) { 'branch/my_branch' }
   let(:branch_name) { 'my_branch' }
 
+  let(:author_email) { 'velma@dinkley.org' }
+  let(:author_name) { 'Velma Dinkley' }
+  let(:commit_subject) { 'Patch holes in van' }
+  let(:committer_email) { 'daphne@blake.org' }
+  let(:committer_name) { 'Daphne Blake' }
+  let(:short_hash) { 'e397ece' }
+
   let(:build) do
     instance_double(
       CodeBuildNotifier::CurrentBuild,
@@ -17,8 +24,10 @@ describe CodeBuildNotifier::BuildHistory do
       launched_by_retry?: false,
       project_code: project_code,
       source_id: source_id,
-      status: status,
-      trigger: trigger
+      trigger: trigger,
+      history_fields: {
+        author_email: author_email
+      }
     )
   end
 
@@ -63,21 +72,17 @@ describe CodeBuildNotifier::BuildHistory do
     it 'sets an update expression by joining the keys to be updated' do
       history.write_entry(source_id) do |updates|
         expect(updates[:update_expression]).to eq(
-          'SET #commit_hash = :commit_hash, ' \
-          '#project_code = :project_code, ' \
-          '#status = :status, #source_ref = :source_ref, ' \
+          'SET #author_email = :author_email, #source_ref = :source_ref, ' \
           '#branch_name = :branch_name'
         )
       end
     end
 
-    it 'it does not set branch name if it is blank' do
+    it 'does not set branch name if it is blank' do
       allow(build).to receive(:branch_name).and_return('')
       history.write_entry(source_id) do |updates|
         expect(updates[:update_expression]).to eq(
-          'SET #commit_hash = :commit_hash, ' \
-          '#project_code = :project_code, ' \
-          '#status = :status, #source_ref = :source_ref'
+          'SET #author_email = :author_email, #source_ref = :source_ref'
         )
       end
     end
@@ -85,13 +90,9 @@ describe CodeBuildNotifier::BuildHistory do
     it 'sets expression attribute names for all the keys to be updated' do
       history.write_entry(source_id) do |updates|
         expect(updates[:expression_attribute_names]).to eq(
-          {
-            '#branch_name' => 'branch_name',
-            '#commit_hash' => 'commit_hash',
-            '#project_code' => 'project_code',
-            '#source_ref' => 'source_ref',
-            '#status' => 'status'
-          }
+          '#author_email' => 'author_email',
+          '#branch_name' => 'branch_name',
+          '#source_ref' => 'source_ref'
         )
       end
     end
@@ -101,12 +102,10 @@ describe CodeBuildNotifier::BuildHistory do
         allow(build).to receive(:launched_by_retry?).and_return(true)
       end
 
-      it 'sets the commit hash, project code, and status' do
+      it 'sets the history fields from the current build' do
         history.write_entry(source_id) do |updates|
           expect(updates[:expression_attribute_values]).to include(
-            ':commit_hash' => commit_hash,
-            ':project_code' => project_code,
-            ':status' => status
+            ':author_email' => author_email
           )
         end
       end
@@ -129,12 +128,10 @@ describe CodeBuildNotifier::BuildHistory do
         allow(build).to receive(:launched_by_retry?).and_return(false)
       end
 
-      it 'sets the commit hash, project code, and status' do
+      it 'sets the history fields from the current build' do
         history.write_entry(source_id) do |updates|
           expect(updates[:expression_attribute_values]).to include(
-            ':commit_hash' => commit_hash,
-            ':project_code' => project_code,
-            ':status' => status
+            ':author_email' => author_email
           )
         end
       end

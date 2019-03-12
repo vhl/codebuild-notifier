@@ -106,6 +106,21 @@ module CodeBuildNotifier
       end
     end
 
+    def history_fields
+      {
+        author_email: author_email,
+        author_name: author_name,
+        build_id: build_id,
+        commit_hash: commit_hash,
+        commit_subject: commit_message_subject,
+        committer_email: committer_email,
+        committer_name: committer_name,
+        git_repo_url: git_repo_url,
+        project_code: project_code,
+        status: status
+      }
+    end
+
     private def git_info
       Git.current_commit
     end
