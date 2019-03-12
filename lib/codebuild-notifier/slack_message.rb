@@ -17,16 +17,14 @@
 
 module CodeBuildNotifier
   class SlackMessage
-    attr_reader :author_email, :author_name, :build, :committer_email,
-                :commit_message_subject, :config, :short_hash
+    attr_reader :build, :config
 
-    delegate :source_ref, to: :build
+    delegate :author_email, :author_name, :committer_email,
+             :commit_message_subject, :short_hash, :source_ref, to: :build
 
     def initialize(build, config)
       @build = build
       @config = config
-      @short_hash, @author_name, @author_email,
-        @committer_email, @commit_message_subject = git_info
     end
 
     def payload
@@ -44,10 +42,6 @@ module CodeBuildNotifier
 
     def additional_channel
       !build.for_pr? && config.additional_channel
-    end
-
-    private def git_info
-      Git.current_commit
     end
 
     private def slack_color

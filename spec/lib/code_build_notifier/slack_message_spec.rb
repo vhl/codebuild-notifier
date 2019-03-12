@@ -16,10 +16,15 @@ describe CodeBuildNotifier::SlackMessage do
   let(:build) do
     instance_double(
       CodeBuildNotifier::CurrentBuild,
+      author_email: author_email,
+      author_name: author_name,
       build_id: build_id,
       commit_hash: commit_hash,
+      commit_message_subject: commit_subject,
+      committer_email: committer_email,
       git_repo_url: git_repo,
       project_code: project_code,
+      short_hash: short_hash,
       source_ref: source_ref,
       status: status
     )
@@ -36,17 +41,13 @@ describe CodeBuildNotifier::SlackMessage do
 
   describe '#recipients' do
     it 'returns author email and commiter email if they are different' do
-      allow(CodeBuildNotifier::Git).to receive(:current_commit).and_return(
-        [short_hash, author_name, author_email, committer_email, commit_subject]
-      )
+      allow(build).to receive(:committer_email).and_return(committer_email)
 
       expect(message.recipients).to eq([author_email, committer_email])
     end
 
     it 'returns only one value if author email and commiter email are equal ' do
-      allow(CodeBuildNotifier::Git).to receive(:current_commit).and_return(
-        [short_hash, author_name, author_email, author_email, commit_subject]
-      )
+      allow(build).to receive(:committer_email).and_return(author_email)
 
       expect(message.recipients).to eq([author_email])
     end
@@ -80,12 +81,6 @@ describe CodeBuildNotifier::SlackMessage do
   end
 
   describe '#payload' do
-    before do
-      allow(CodeBuildNotifier::Git).to receive(:current_commit).and_return(
-        [short_hash, author_name, author_email, committer_email, commit_subject]
-      )
-    end
-
     it 'includes the name of the commit author in the fallback and title keys' do
       expect(
         [message.payload[:fallback], message.payload[:title]]
