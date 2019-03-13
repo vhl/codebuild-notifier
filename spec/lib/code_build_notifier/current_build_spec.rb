@@ -128,20 +128,20 @@ describe CodeBuildNotifier::CurrentBuild do
   end
 
   describe '#for_pr?' do
-    it 'is true if trigger starts with "pr/"' do
-      expect(described_class.new(trigger: 'pr/100')).to be_for_pr
+    it 'is true if source_version starts with "pr/"' do
+      expect(described_class.new(source_version: 'pr/100')).to be_for_pr
     end
 
-    it 'is false if trigger contains, but does not start with "pr/"' do
-      expect(described_class.new(trigger: 'branch/pr/100')).not_to be_for_pr
+    it 'is false if source_version contains, but does not start with "pr/"' do
+      expect(described_class.new(source_version: 'branch/pr/100')).not_to be_for_pr
     end
 
-    it 'is false if trigger is nil' do
-      expect(described_class.new(trigger: nil)).not_to be_for_pr
+    it 'is false if source_version is nil' do
+      expect(described_class.new(source_version: nil)).not_to be_for_pr
     end
 
-    it 'is false if trigger is empty string' do
-      expect(described_class.new(trigger: '')).not_to be_for_pr
+    it 'is false if source_version is empty string' do
+      expect(described_class.new(source_version: '')).not_to be_for_pr
     end
   end
 
