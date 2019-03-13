@@ -122,17 +122,16 @@ end.parse!
 config = CodeBuildNotifier::Config.new(command_line_opts)
 build = CodeBuildNotifier::CurrentBuild.new
 history = CodeBuildNotifier::BuildHistory.new(config, build)
-
 last_build = history.last_entry
 build.previous_build = last_build
 
 if build.launched_by_retry?
   # Whenever a build is triggered by a PR or whitelisted branch, we update
-  # the record for that trigger with the commit hash. If a build is then
-  # launched using Retry, the status is updated and are notifications sent
-  # only if the re-tried build was for the latest commit. Otherwise re-trying
-  # an older commit could result in inaccurate notifications.
-  quit(not_latest_commit_in_branch_message(build, config)) unless last_build
+  # the record for that trigger with the commit hash. If a build is
+  # launched using Retry, and there is no history entry for the current
+  # commit hash, then the build is not for a PR or a whitelisted branch,
+  # and should not be tracked.
+  quit(not_pr_or_whitelisted_branch_message(config)) unless last_build
 else
   # We only want to track information for whitelisted branches and branches
   # with open Pull Requests.
@@ -141,8 +140,6 @@ else
   end
 end
 
-# Update record for this project + branch/pr in DynamoDb even if the
-# status hasn't changed, so the latest commit hash is stored.
 history.write_entry(build.source_id) do |new_item|
   cb_puts "Updating dynamo table #{config.dynamo_table} with: #{new_item}"
 end
