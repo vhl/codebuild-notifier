@@ -18,7 +18,8 @@
 module CodeBuildNotifier
   class CurrentBuild
     attr_accessor :previous_build
-    attr_reader :build_id, :commit_hash, :git_repo_url, :status_code, :trigger
+    attr_reader :build_id, :commit_hash, :git_repo_url, :source_version,
+                :start_time, :status_code, :trigger
 
     # attrs from git info
     attr_reader :author_email, :author_name, :committer_email, :committer_name,
@@ -31,7 +32,9 @@ module CodeBuildNotifier
       commit_hash: ENV['CODEBUILD_RESOLVED_SOURCE_VERSION'],
       git_repo: ENV['CODEBUILD_SOURCE_REPO_URL'],
       head_ref: ENV['CODEBUILD_WEBHOOK_HEAD_REF'],
+      start_time: ENV['CODEBUILD_START_TIME'],
       status_code: ENV['CODEBUILD_BUILD_SUCCEEDING'],
+      source_version: ENV['CODEBUILD_SOURCE_VERSION'],
       trigger: ENV['CODEBUILD_WEBHOOK_TRIGGER']
     )
       @build_id = build_id
@@ -39,6 +42,8 @@ module CodeBuildNotifier
       # Handle repos specified with and without optional .git suffix.
       @git_repo_url = git_repo.to_s.gsub(/\.git\z/, '')
       @head_ref = head_ref
+      @source_version = source_version
+      @start_time = start_time || (Time.now.to_f * 1_000).to_i
       @status_code = status_code
       @trigger = trigger
 
@@ -117,6 +122,7 @@ module CodeBuildNotifier
         committer_name: committer_name,
         git_repo_url: git_repo_url,
         project_code: project_code,
+        start_time: start_time,
         status: status
       }
     end
