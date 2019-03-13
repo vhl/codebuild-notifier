@@ -78,7 +78,7 @@ module CodeBuildNotifier
     end
 
     def for_pr?
-      %r{^pr/}.match?(trigger.to_s)
+      %r{^pr/}.match?(source_version.to_s)
     end
 
     # source_id, the primary key, is a composite of project_code and
