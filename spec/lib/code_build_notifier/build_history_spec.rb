@@ -8,6 +8,7 @@ describe CodeBuildNotifier::BuildHistory do
   let(:status) { 'FAILED' }
   let(:trigger) { 'branch/my_branch' }
   let(:branch_name) { 'my_branch' }
+  let(:source_version) { commit_hash }
 
   let(:author_email) { 'velma@dinkley.org' }
   let(:author_name) { 'Velma Dinkley' }
@@ -15,15 +16,19 @@ describe CodeBuildNotifier::BuildHistory do
   let(:committer_email) { 'daphne@blake.org' }
   let(:committer_name) { 'Daphne Blake' }
   let(:short_hash) { 'e397ece' }
+  let(:start_time) { '244059876000' }
 
   let(:build) do
     instance_double(
       CodeBuildNotifier::CurrentBuild,
       branch_name: branch_name,
       commit_hash: commit_hash,
+      for_pr?: true,
       launched_by_retry?: false,
       project_code: project_code,
       source_id: source_id,
+      source_version: source_version,
+      start_time: start_time,
       trigger: trigger,
       history_fields: {
         author_email: author_email
@@ -63,17 +68,17 @@ describe CodeBuildNotifier::BuildHistory do
       end.to yield_with_args(Hash)
     end
 
-    it 'sets the primary key to the specified source_id' do
+    it 'sets the primary partition key to the specified source_id' do
       history.write_entry(source_id) do |updates|
-        expect(updates[:key]).to eq(source_id: source_id)
+        expect(updates[:key]).to include(source_id: source_id)
       end
     end
 
     it 'sets an update expression by joining the keys to be updated' do
       history.write_entry(source_id) do |updates|
         expect(updates[:update_expression]).to eq(
-          'SET #author_email = :author_email, #source_ref = :source_ref, ' \
-          '#branch_name = :branch_name'
+          'SET #author_email = :author_email, ' \
+          '#source_ref = :source_ref, #branch_name = :branch_name'
         )
       end
     end
@@ -82,7 +87,8 @@ describe CodeBuildNotifier::BuildHistory do
       allow(build).to receive(:branch_name).and_return('')
       history.write_entry(source_id) do |updates|
         expect(updates[:update_expression]).to eq(
-          'SET #author_email = :author_email, #source_ref = :source_ref'
+          'SET #author_email = :author_email, ' \
+          '#source_ref = :source_ref'
         )
       end
     end
@@ -98,7 +104,12 @@ describe CodeBuildNotifier::BuildHistory do
     end
 
     context 'when the build was launched by Retry command,' do
+      let(:old_start_time) { '1552501476000' }
+
       before do
+        allow(dynamo_client).to receive(:query).and_return(
+          Hashie::Mash.new(items: [{ start_time: old_start_time }])
+        )
         allow(build).to receive(:launched_by_retry?).and_return(true)
       end
 
@@ -106,6 +117,15 @@ describe CodeBuildNotifier::BuildHistory do
         history.write_entry(source_id) do |updates|
           expect(updates[:expression_attribute_values]).to include(
             ':author_email' => author_email
+          )
+        end
+      end
+
+      it 'sets a version key made up of the start time of the ' \
+         'last entry and the current build start time' do
+        history.write_entry(source_id) do |updates|
+          expect(updates[:key]).to include(
+            version_key: "#{old_start_time}_#{start_time}"
           )
         end
       end
@@ -136,6 +156,15 @@ describe CodeBuildNotifier::BuildHistory do
         end
       end
 
+      it 'sets a version key made up of the start time of the ' \
+         'current build, repeated twice' do
+        history.write_entry(source_id) do |updates|
+          expect(updates[:key]).to include(
+            version_key: "#{start_time}_#{start_time}"
+          )
+        end
+      end
+
       it 'sets the source ref to be the trigger of the build' do
         history.write_entry(source_id) do |updates|
           expect(updates[:expression_attribute_values]).to include(
@@ -162,28 +191,61 @@ describe CodeBuildNotifier::BuildHistory do
         .with(hash_including(region: region))
     end
 
+    it 'queries the dynamo table specified in config' do
+      described_class.new(config, build).last_entry
+
+      expect(dynamo_client).to have_received(:query)
+        .with(hash_including(table_name: dynamo_table))
+    end
+
+    it 'sorts the results with newest items first' do
+      described_class.new(config, build).last_entry
+
+      expect(dynamo_client).to have_received(:query)
+        .with(hash_including(scan_index_forward: false))
+    end
+
     context 'when the build was launched by Retry command' do
       before do
         allow(build).to receive(:launched_by_retry?).and_return(true)
       end
 
-      it 'queries the dynamo table specified in config' do
-        described_class.new(config, build).last_entry
+      context 'when build is for a pr,' do
+        before { allow(build).to receive(:for_pr?).and_return(true) }
 
-        expect(dynamo_client).to have_received(:query)
-          .with(hash_including(table_name: dynamo_table))
+        it 'queries using the commit hash, project code, and source version ' \
+           'of the build' do
+          described_class.new(config, build).last_entry
+
+          expected_attr_values = {
+            ':commit_hash' => commit_hash,
+            ':project_code' => project_code,
+            ':source_ref' => source_version
+          }
+
+          expect(dynamo_client).to have_received(:query).with(
+            hash_including(expression_attribute_values: expected_attr_values)
+          )
+        end
       end
 
-      it 'queries using the commit hash and project code from the build' do
-        described_class.new(config, build).last_entry
+      context 'when build not is for a pr,' do
+        before { allow(build).to receive(:for_pr?).and_return(false) }
 
-        expected_attr_values = {
-          ':commit_hash' => commit_hash, ':project_code' => project_code
-        }
+        it 'queries using the commit hash and project code of the build, ' \
+           'and a source ref starting with "build/"' do
+          described_class.new(config, build).last_entry
 
-        expect(dynamo_client).to have_received(:query).with(
-          hash_including(expression_attribute_values: expected_attr_values)
-        )
+          expected_attr_values = {
+            ':commit_hash' => commit_hash,
+            ':project_code' => project_code,
+            ':source_ref' => 'branch/'
+          }
+
+          expect(dynamo_client).to have_received(:query).with(
+            hash_including(expression_attribute_values: expected_attr_values)
+          )
+        end
       end
 
       it 'returns nil when no results are found' do
@@ -213,18 +275,14 @@ describe CodeBuildNotifier::BuildHistory do
         allow(build).to receive(:launched_by_retry?).and_return(false)
       end
 
-      it 'calls get_item on the dynamo table specified in config' do
+      it 'queries using the commit hash and project code from the build' do
         described_class.new(config, build).last_entry
 
-        expect(dynamo_client).to have_received(:get_item)
-          .with(hash_including(table_name: dynamo_table))
-      end
+        expected_attr_values = { ':source_id' => source_id }
 
-      it 'specifies the source id of the build as the get_item key' do
-        described_class.new(config, build).last_entry
-
-        expect(dynamo_client).to have_received(:get_item)
-          .with(hash_including(key: { 'source_id' => source_id }))
+        expect(dynamo_client).to have_received(:query).with(
+          hash_including(expression_attribute_values: expected_attr_values)
+        )
       end
 
       it 'returns nil when no result is found' do
@@ -235,11 +293,11 @@ describe CodeBuildNotifier::BuildHistory do
         let(:value) { 'some_value' }
 
         let(:query_results) do
-          Hashie::Mash.new(item: { attr: value })
+          Hashie::Mash.new(items: [{ attr: value }])
         end
 
         before do
-          allow(dynamo_client).to receive(:get_item).and_return(query_results)
+          allow(dynamo_client).to receive(:query).and_return(query_results)
         end
 
         it 'returns a Hashie::Mash initialized with the first result' do
