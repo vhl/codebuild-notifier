@@ -15,22 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with codebuild-notifier.  If not, see <http://www.gnu.org/licenses/>.
 
-require 'active_support'
-require 'active_support/core_ext'
-require 'aws-sdk-dynamodb'
-require 'hashie'
-
 module CodeBuildNotifier
-  class BuildHistory
-    attr_reader :config, :current_build
-
-    delegate :dynamo_table, to: :config
+  class BuildHistory < DynamoBase
     delegate :branch_name, :launched_by_retry?, to: :current_build
-
-    def initialize(config, current_build)
-      @config = config
-      @current_build = current_build
-    end
 
     def last_entry
       return @last_entry if defined?(@last_entry)
@@ -45,17 +32,14 @@ module CodeBuildNotifier
 
     def write_entry(source_id)
       updates = hash_to_dynamo_update(new_entry).merge(
-        key: {
-          source_id: source_id,
-          version_key: version_key
-        }
+        key: { source_id: source_id, version_key: version_key }
       )
 
       yield updates if block_given?
 
-      dynamo_client.update_item(
-        updates.merge(table_name: dynamo_table)
-      )
+      update_item(updates)
+
+      ProjectSummary.new(config, current_build).update
     end
 
     # The commit hash and project code are used to find which Pull Request
@@ -138,23 +122,6 @@ module CodeBuildNotifier
       else
         "#{current_build.start_time}_#{current_build.start_time}"
       end
-    end
-
-    private def hash_to_dynamo_update(hash)
-      update = hash.each_with_object(
-        expression_attribute_names: {},
-        expression_attribute_values: {},
-        update_expression: []
-      ) do |(key, value), memo|
-        memo[:expression_attribute_names]["##{key}"] = key.to_s
-        memo[:expression_attribute_values][":#{key}"] = value
-        memo[:update_expression] << "##{key} = :#{key}"
-      end
-      update.merge(update_expression: "SET #{update[:update_expression].join(', ')}")
-    end
-
-    private def dynamo_client
-      @dynamo_client || Aws::DynamoDB::Client.new(region: config.region)
     end
   end
 end
