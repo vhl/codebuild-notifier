@@ -1,14 +1,14 @@
 describe CodeBuildNotifier::BuildHistory do
+  let(:branch_name) { 'my_branch' }
   let(:commit_hash) { 'b2ec4811171dc0755fff2a13f1d547e77c5bb0d6' }
   let(:dynamo_client) { instance_double(Aws::DynamoDB::Client) }
   let(:dynamo_table) { 'test-table-name' }
   let(:project_code) { 'codebuild-ruby2.5' }
   let(:region) { 'us-east-99' }
   let(:source_id) { "#{project_code}:#{trigger}" }
+  let(:source_version) { commit_hash }
   let(:status) { 'FAILED' }
   let(:trigger) { 'branch/my_branch' }
-  let(:branch_name) { 'my_branch' }
-  let(:source_version) { commit_hash }
 
   let(:author_email) { 'velma@dinkley.org' }
   let(:author_name) { 'Velma Dinkley' }
@@ -44,6 +44,10 @@ describe CodeBuildNotifier::BuildHistory do
     )
   end
 
+  let(:project_summary) do
+    instance_double(CodeBuildNotifier::ProjectSummary, update: true)
+  end
+
   before do
     allow(Aws::DynamoDB::Client).to receive(:new).and_return(dynamo_client)
   end
@@ -53,6 +57,8 @@ describe CodeBuildNotifier::BuildHistory do
 
     before do
       allow(dynamo_client).to receive(:update_item)
+      allow(CodeBuildNotifier::ProjectSummary).to receive(:new)
+        .and_return(project_summary)
     end
 
     it 'calls update_item on the dynamo table specified in config' do
@@ -101,6 +107,21 @@ describe CodeBuildNotifier::BuildHistory do
           '#source_ref' => 'source_ref'
         )
       end
+    end
+
+    it 'insantiates a new ProjectSummary instance, passing in config and ' \
+       'current build' do
+      history.write_entry(source_id)
+
+      expect(CodeBuildNotifier::ProjectSummary).to have_received(:new).with(
+        config, build
+      )
+    end
+
+    it 'updates the project summary' do
+      history.write_entry(source_id)
+
+      expect(project_summary).to have_received(:update)
     end
 
     context 'when the build was launched by Retry command,' do
