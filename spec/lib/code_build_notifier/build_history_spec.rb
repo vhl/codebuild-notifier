@@ -48,6 +48,10 @@ describe CodeBuildNotifier::BuildHistory do
     instance_double(CodeBuildNotifier::ProjectSummary, update: true)
   end
 
+  let(:branch_entry) do
+    instance_double(CodeBuildNotifier::BranchEntry, update: true)
+  end
+
   before do
     allow(Aws::DynamoDB::Client).to receive(:new).and_return(dynamo_client)
   end
@@ -59,6 +63,8 @@ describe CodeBuildNotifier::BuildHistory do
       allow(dynamo_client).to receive(:update_item)
       allow(CodeBuildNotifier::ProjectSummary).to receive(:new)
         .and_return(project_summary)
+      allow(CodeBuildNotifier::BranchEntry).to receive(:new)
+        .and_return(branch_entry)
     end
 
     it 'calls update_item on the dynamo table specified in config' do
@@ -122,6 +128,21 @@ describe CodeBuildNotifier::BuildHistory do
       history.write_entry(source_id)
 
       expect(project_summary).to have_received(:update)
+    end
+
+    it 'insantiates a new BranchEntry instance, passing in config and ' \
+       'current build' do
+      history.write_entry(source_id)
+
+      expect(CodeBuildNotifier::BranchEntry).to have_received(:new).with(
+        config, build
+      )
+    end
+
+    it 'updates the branch entry' do
+      history.write_entry(source_id)
+
+      expect(branch_entry).to have_received(:update)
     end
 
     context 'when the build was launched by Retry command,' do
