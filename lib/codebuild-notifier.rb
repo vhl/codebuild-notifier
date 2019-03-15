@@ -17,6 +17,7 @@
 
 require 'codebuild-notifier/config'
 require 'codebuild-notifier/dynamo_base'
+require 'codebuild-notifier/branch_entry'
 require 'codebuild-notifier/build_history'
 require 'codebuild-notifier/current_build'
 require 'codebuild-notifier/git'

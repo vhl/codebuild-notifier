@@ -40,6 +40,7 @@ module CodeBuildNotifier
       update_item(updates)
 
       ProjectSummary.new(config, current_build).update
+      BranchEntry.new(config, current_build).update
     end
 
     # The commit hash and project code are used to find which Pull Request
