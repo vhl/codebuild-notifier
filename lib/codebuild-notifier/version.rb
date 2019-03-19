@@ -16,5 +16,5 @@
 # along with codebuild-notifier.  If not, see <http://www.gnu.org/licenses/>.
 
 module CodeBuildNotifier
-  VERSION = '0.3.2'.freeze
+  VERSION = '1.0.0'.freeze
 end
