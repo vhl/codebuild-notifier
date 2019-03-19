@@ -17,7 +17,7 @@
 
 module CodeBuildNotifier
   class Config
-    DEFAULT_WHITELIST = %w[master release]
+    DEFAULT_WHITELIST = %w[master]
 
     attr_reader :additional_channel, :default_strategy, :dynamo_table, :region,
                 :slack_admins, :slack_secret_name, :whitelist_branches
@@ -27,7 +27,7 @@ module CodeBuildNotifier
     def initialize(
       additional_channel: ENV['CBN_ADDITIONAL_CHANNEL'],
       default_strategy: ENV['CBN_DEFAULT_NOTIFY_STRATEGY'] || 'fail_or_status_change',
-      dynamo_table: ENV['CBN_DYNAMO_TABLE'] || 'branch-build-status',
+      dynamo_table: ENV['CBN_DYNAMO_TABLE'] || 'codebuild-history',
       region: ENV['CBN_AWS_REGION'] || ENV['AWS_REGION'],
       slack_admins: ENV['CBN_SLACK_ADMIN_USERNAMES'],
       slack_secret_name: ENV['CBN_SLACK_SECRET_NAME'] || 'slack/codebuild',
