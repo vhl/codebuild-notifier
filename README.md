@@ -25,25 +25,28 @@ will come from a user with a name you choose, e.g. CodeBuildBot
 AWS Secrets Manager instead of the App token.
 
 ### DynamoDB table
- - expected to be named 'branch-build-status', but can be configured
+ - expected to be named 'codebuild-history', but can be configured
  - the following definition:
 
 ```ruby
   AttributeDefinitions [
+    { AttributeName: 'commit_hash', AttributeType: 'S' },
     { AttributeName: 'source_id', AttributeType: 'S' },
-    { AttributeName: 'commit_hash', AttributeType: 'S' }
+    { AttributeName: 'version_key', AttributeType: 'S' }
   ]
   GlobalSecondaryIndexes [
     {
       IndexName: 'commit_hash_index',
       KeySchema: [
-        { AttributeName: 'commit_hash', KeyType: 'HASH' }
+        { AttributeName: 'commit_hash', KeyType: 'HASH' },
+        { AttributeName: 'version_key', KeyType: 'RANGE' }
       ],
-      Projection: { ProjectionType: 'ALL' },
+      Projection: { ProjectionType: 'ALL' }
     }
   ]
   KeySchema [
-    { AttributeName: 'source_id', KeyType: 'HASH' }
+    { AttributeName: 'source_id', KeyType: 'HASH' },
+    { AttributeName: 'version_key', KeyType: 'RANGE' }
   ]
 ```
 
@@ -72,8 +75,8 @@ name:
   ],
   "Effect": "Allow",
   "Resource": [
-    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/branch-build-status",
-    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/branch-build-status/*"
+    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/codebuild-history",
+    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/codbuild-history/*"
   ]
 },
 {
@@ -221,7 +224,7 @@ phases:
       <nobr>--dynamo-table</nobr>
     </td>
     <td>
-      branch-build-status
+      codebuild-history
     </td>
     <td>
       This table must be created and permissions granted to it as described
@@ -287,7 +290,7 @@ phases:
       <nobr>--whitelist-branches</nobr>
     </td>
     <td>
-      master,release
+      master
     </td>
     <td>
       Normally statuses will be stored and notifications sent only for builds
