@@ -60,7 +60,7 @@ module CodeBuildNotifier
     private def find_slack_user(email)
       slack_client.users_lookupByEmail(email: email)&.user
     rescue Slack::Web::Api::Errors::SlackError => e
-      alias_email = alias_list&.find(email)
+      alias_email = find_alias(email)
       if alias_email
         find_slack_user(alias_email)
       else
@@ -76,8 +76,11 @@ module CodeBuildNotifier
       )
     end
 
-    private def alias_list
-      @alias_list ||= config.slack_alias_table && SlackAliasList.new(config)
+    def find_alias(email)
+      config.slack_alias_table && config.dynamo_client.get_item(
+        table_name: config.slack_alias_table,
+        key: { 'alternate_email' => email }
+      ).item&.fetch('workspace_email')
     end
 
     # If the app token starts with xoxb- then it is a Bot User Oauth token

@@ -39,8 +39,8 @@ describe CodeBuildNotifier::BuildHistory do
   let(:config) do
     instance_double(
       CodeBuildNotifier::Config,
-      dynamo_table: dynamo_table,
-      region: region
+      dynamo_client: dynamo_client,
+      dynamo_table: dynamo_table
     )
   end
 
@@ -224,13 +224,6 @@ describe CodeBuildNotifier::BuildHistory do
     before do
       allow(dynamo_client).to receive(:query).and_return(empty_query_results)
       allow(dynamo_client).to receive(:get_item).and_return(empty_get_item_results)
-    end
-
-    it 'instantiates a dynamo client with the region specified in config' do
-      described_class.new(config, build).last_entry
-
-      expect(Aws::DynamoDB::Client).to have_received(:new)
-        .with(hash_including(region: region))
     end
 
     it 'queries the dynamo table specified in config' do

@@ -1,4 +1,16 @@
 describe CodeBuildNotifier::Config do
+  describe '#dynamo_client' do
+    it 'instantiates a dynamo client with the specified region' do
+      region = 'us-whatever'
+      allow(Aws::DynamoDB::Client).to receive(:new)
+
+      described_class.new(region: region).dynamo_client
+
+      expect(Aws::DynamoDB::Client).to have_received(:new)
+        .with(hash_including(region: region))
+    end
+  end
+
   describe '#slack_admins' do
     it 'returns single element array if a value with no commas is specified' do
       user = 'frank'

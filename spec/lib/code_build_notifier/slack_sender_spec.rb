@@ -1,6 +1,7 @@
 describe CodeBuildNotifier::SlackSender do
   let(:author_email) { 'author@workspace.com' }
   let(:author_slack_id) { 'U1040B40' }
+  let(:dynamo_client) { instance_double(Aws::DynamoDB::Client) }
   let(:payload) { { text: 'happy_message' } }
   let(:region) { 'us-east-99' }
   let(:app_auth_token) { 'xoxp-my-app-token' }
@@ -8,7 +9,6 @@ describe CodeBuildNotifier::SlackSender do
   let(:secret_item) { Hashie::Mash.new(secret_string: json_secret) }
   let(:json_secret) { { token: app_auth_token }.to_json }
   let(:slack_secret_name) { 'slack/codebuild-secret' }
-
   let(:secrets_client) { instance_double(Aws::SecretsManager::Client) }
 
   let(:slack_client) do
@@ -22,6 +22,7 @@ describe CodeBuildNotifier::SlackSender do
   let(:config) do
     instance_double(
       CodeBuildNotifier::Config,
+      dynamo_client: dynamo_client,
       region: region,
       slack_admins: [],
       slack_alias_table: nil,
@@ -187,37 +188,39 @@ describe CodeBuildNotifier::SlackSender do
       end
 
       context 'when a slack_alias_table is configured,' do
-        let(:alias_class) { CodeBuildNotifier::SlackAliasList }
-        let(:slack_alias_list) { instance_double(alias_class, find: nil) }
         let(:slack_alias_table) { 'slack-aliases' }
         let(:workspace_email) { 'workspace@example.com' }
+        let(:empty_item) { Hashie::Mash.new(item: nil) }
+        let(:alias_item) do
+          Hashie::Mash.new(item: { 'workspace_email' => workspace_email })
+        end
 
         before do
           allow(config).to receive(:slack_alias_table)
             .and_return(slack_alias_table)
-          allow(alias_class).to receive(:new).and_return(slack_alias_list)
           allow(slack_client).to receive(:users_lookupByEmail)
             .with(email: author_email)
             .and_raise(slack_error_class, slack_error_message)
+          allow(dynamo_client).to receive(:get_item).and_return(empty_item)
         end
 
-        it 'instantiates a SlackAliasList, passing in config' do
+        it 'looks for a slack alias dynamo table entry with the email ' \
+           'address of the author' do
           described_class.new(config).send(slack_message)
 
-          expect(alias_class).to have_received(:new).with(config)
+          expect(dynamo_client).to have_received(:get_item).with(
+            hash_including(
+              key: { 'alternate_email' => author_email },
+              table_name: slack_alias_table
+            )
+          )
         end
 
-        it 'searches for a slack alias with the email address of the author' do
-          described_class.new(config).send(slack_message)
-
-          expect(slack_alias_list).to have_received(:find)
-            .with(author_email)
-        end
-
-        context 'when the alias list lookup returns an email address,' do
+        context 'when the alias lookup returns an email address,' do
           before do
-            allow(slack_alias_list).to receive(:find)
-              .with(author_email).and_return(workspace_email)
+            allow(dynamo_client).to receive(:get_item)
+              .with(hash_including(key: { 'alternate_email' => author_email }))
+              .and_return(alias_item)
           end
 
           it 'posts a chat message to the author when a slack user ' \
@@ -248,7 +251,7 @@ describe CodeBuildNotifier::SlackSender do
 
         it 'does not try to send a slack notification to the author' \
            'when the alias lookup returns no results' do
-          allow(slack_alias_list).to receive(:find).and_return(nil)
+          allow(dynamo_client).to receive(:get_item).and_return(empty_item)
 
           described_class.new(config).send(slack_message)
 

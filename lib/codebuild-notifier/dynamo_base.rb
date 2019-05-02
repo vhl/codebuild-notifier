@@ -17,14 +17,13 @@
 
 require 'active_support'
 require 'active_support/core_ext'
-require 'aws-sdk-dynamodb'
 require 'hashie'
 
 module CodeBuildNotifier
   class DynamoBase
     attr_reader :config, :current_build
 
-    delegate :dynamo_table, to: :config
+    delegate :dynamo_client, :dynamo_table, to: :config
 
     def initialize(config, build)
       @config = config
@@ -35,10 +34,6 @@ module CodeBuildNotifier
       dynamo_client.update_item(
         updates.merge(table_name: dynamo_table)
       )
-    end
-
-    private def dynamo_client
-      @dynamo_client || Aws::DynamoDB::Client.new(region: config.region)
     end
 
     private def hash_to_dynamo_update(hash)
