@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with codebuild-notifier.  If not, see <http://www.gnu.org/licenses/>.
 
+require 'aws-sdk-dynamodb'
+
 module CodeBuildNotifier
   class Config
     DEFAULT_WHITELIST = %w[master].freeze
@@ -45,6 +47,10 @@ module CodeBuildNotifier
       @slack_secret_name = slack_secret_name
       @strategy_overrides = strategy_overrides&.split(',') || []
       @whitelist_branches = whitelist_branches&.split(',') || DEFAULT_WHITELIST
+    end
+
+    def dynamo_client
+      @dynamo_client || Aws::DynamoDB::Client.new(region: region)
     end
 
     def strategy_for_branch(branch_name)
