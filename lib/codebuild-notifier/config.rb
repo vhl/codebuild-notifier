@@ -17,10 +17,11 @@
 
 module CodeBuildNotifier
   class Config
-    DEFAULT_WHITELIST = %w[master]
+    DEFAULT_WHITELIST = %w[master].freeze
 
-    attr_reader :additional_channel, :default_strategy, :dynamo_table, :region,
-                :slack_admins, :slack_secret_name, :whitelist_branches
+    attr_reader :additional_channel, :default_strategy, :dynamo_table,
+                :region, :slack_admins, :slack_alias_table,
+                :slack_secret_name, :whitelist_branches
 
     # Configuration values specific to CodeBuild Notifier. CBN_ prefix is
     # used because ENV vars with CODEBUILD_ prefix are reserved for use by AWS.
@@ -30,6 +31,7 @@ module CodeBuildNotifier
       dynamo_table: ENV['CBN_DYNAMO_TABLE'] || 'codebuild-history',
       region: ENV['CBN_AWS_REGION'] || ENV['AWS_REGION'],
       slack_admins: ENV['CBN_SLACK_ADMIN_USERNAMES'],
+      slack_alias_table: ENV['CBN_SLACK_ALIAS_TABLE'],
       slack_secret_name: ENV['CBN_SLACK_SECRET_NAME'] || 'slack/codebuild',
       strategy_overrides: ENV['CBN_OVERRIDE_NOTIFY_STRATEGY'],
       whitelist_branches: ENV['CBN_WHITELIST_BRANCHES']
@@ -39,6 +41,7 @@ module CodeBuildNotifier
       @dynamo_table = dynamo_table
       @region = region
       @slack_admins = slack_admins&.split(',') || []
+      @slack_alias_table = slack_alias_table
       @slack_secret_name = slack_secret_name
       @strategy_overrides = strategy_overrides&.split(',') || []
       @whitelist_branches = whitelist_branches&.split(',') || DEFAULT_WHITELIST

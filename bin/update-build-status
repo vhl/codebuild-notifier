@@ -99,6 +99,16 @@ OptionParser.new do |opts|
   end
 
   opts.on(
+    '--slack-alias-table=TABLE',
+    'optional dynamodb table for storing alternate email addresses for when ' \
+    'the commit author email is different from the address associated with ' \
+    'their slack account; can also help with failed lookups for ' \
+    'someuser@noreply.github.com'
+  ) do |table|
+    command_line_opts[:slack_alias_table] = table
+  end
+
+  opts.on(
     '--slack-secret-name=SECRET',
     'name of Secrets Manager secret with slack app/bot auth token'
   ) do |slack_secret|
