@@ -1,11 +1,11 @@
 # codebuild-notifier
-Reports status of AWS CodeBuild CI jobs to slack.
+Reports status of AWS CodeBuild CI jobs to Slack.
 
 # Infrastructure Requirements
 
 ### Slack App or Bot in your workspace
 
-Notifications will be sent as slack Direct Messages to users from the default
+Notifications will be sent as Slack Direct Messages to users from the default
 Slack bot in your workspace (e.g. @slackbot)
 - Go to <a href="https://api.slack.com/apps">https://api.slack.com/apps</a>
 - Create a New App, e.g. App Name: CodeBuild Notifier
@@ -24,7 +24,7 @@ will come from a user with a name you choose, e.g. CodeBuildBot
 - A new OAuth token will be generated specific to the Bot User. Store this in
 AWS Secrets Manager instead of the App token.
 
-### DynamoDB table
+### DynamoDB table for build history
  - expected to be named 'codebuild-history', but can be configured
  - the following definition:
 
@@ -57,6 +57,39 @@ AWS Secrets Manager instead of the App token.
    { "token": "xoxo-your-slack-app-token" }
 ```
 
+### Optional DynamoDB table for Slack aliases
+
+Slack message recipients are located by extracting the email address of the
+author/commiter of the git commit triggering the build, then searching
+for users with that email address within the Slack workspace.
+
+Users might sign commits with a different email address than they used
+to register with Slack. Even if their git config has a matching address, 
+merges and commits made via the github web interface may use the primary
+email address for the user's github account, or username@noreply.github.com.
+
+To ensure delivery in these cases, a second DynamoDb table can be created
+and configured to do a second lookup if the original lookup fails.
+
+ - suggested table name: 'codebuild-slack-aliases', but can be configured
+ - by default, the table name is unspecified,  meaning no second lookup will
+   be performed
+ - the email address for which the original lookup fails (the commit
+   signature address) should be stored in index field `alternate_email`
+ - the user's Slack email address should be stored in a string field
+   named `workspace_email`
+ - multiple items can be created with different values for `alternate_email`
+   pointing to the same `workspace_email` value
+ - the table should have the following definition:
+```ruby
+  AttributeDefinitions [
+    { AttributeName: 'alternate_email', AttributeType: 'S' }
+  ]
+  KeySchema [
+    { AttributeName: 'alternate_email', KeyType: 'HASH' }
+  ]
+```
+
 ### IAM Service Role for CodeBuild projects
 
 You will likely already have a service role granting CloudWatch access, to
@@ -76,7 +109,10 @@ name:
   "Effect": "Allow",
   "Resource": [
     "arn:aws:dynamodb:<your-region>:<your-account-id>:table/codebuild-history",
-    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/codbuild-history/*"
+    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/codbuild-history/*",
+    // if optional slack alias table is configured
+    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/codebuild-slack-aliases",
+    "arn:aws:dynamodb:<your-region>:<your-account-id>:table/codbuild-slack-aliases/*"
   ]
 },
 {
@@ -87,6 +123,7 @@ name:
   ]
 }
 ```
+
 
 # Configuration
 
@@ -261,11 +298,28 @@ phases:
       not set
     </td>
     <td>
-      If no slack user can be found in your workspace with the email
+      If no Slack user can be found in your workspace with the email
       address of the author or committer of a commit, a message will be
-      sent to the slack usernames specified.<br />
+      sent to the Slack usernames specified.<br />
       Separate multiple values with commas, with no spaces.<br />
       e.g. fred,velma
+    </td>
+  </tr>
+  <tr>
+    <th>
+      CBN_SLACK_ALIAS_TABLE
+    </th>
+    <td>
+      <nobr>--slack-alias-table</nobr>
+    </td>
+    <td>
+      not set
+    </td>
+    <td>
+      If no Slack user can be found in your workspace with the email
+      address of the author or committer of a commit, this table will
+      be queried to find the Slack workspace email matching the failed
+      address.
     </td>
   </tr>
   <tr>

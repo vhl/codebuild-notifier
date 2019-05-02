@@ -15,14 +15,20 @@
 # You should have received a copy of the GNU General Public License
 # along with codebuild-notifier.  If not, see <http://www.gnu.org/licenses/>.
 
-require 'codebuild-notifier/config'
-require 'codebuild-notifier/dynamo_base'
-require 'codebuild-notifier/branch_entry'
-require 'codebuild-notifier/build_history'
-require 'codebuild-notifier/current_build'
-require 'codebuild-notifier/git'
-require 'codebuild-notifier/project_summary'
-require 'codebuild-notifier/slack_alias_list'
-require 'codebuild-notifier/slack_message'
-require 'codebuild-notifier/slack_sender'
-require 'codebuild-notifier/version'
+module CodeBuildNotifier
+  class SlackAliasList < DynamoBase
+    attr_reader :table_name
+
+    def initialize(config)
+      super(config, nil)
+      @table_name = config.slack_alias_table
+    end
+
+    def find(email)
+      dynamo_client.get_item(
+        table_name: table_name,
+        key: { 'alternate_email' => email }
+      ).item&.fetch('main_email')
+    end
+  end
+end

@@ -34,10 +34,8 @@ module CodeBuildNotifier
         post_message(message, channel)
       end
 
-      message.recipients.each do |email|
-        slack_user_id = find_slack_user(email)
-        slack_user_id && post_message(message, slack_user_id)
-      end
+      user_ids = message.recipients.map { |email| find_slack_user(email)&.id }
+      user_ids.uniq.compact.each { |user_id| post_message(message, user_id) }
     end
 
     private def post_message(message, channel)
@@ -60,14 +58,26 @@ module CodeBuildNotifier
     end
 
     private def find_slack_user(email)
-      lookup_response = slack_client.users_lookupByEmail(email: email)
-      lookup_response.user.id
+      slack_client.users_lookupByEmail(email: email)&.user
     rescue Slack::Web::Api::Errors::SlackError => e
+      alias_email = alias_list&.find(email)
+      if alias_email
+        find_slack_user(alias_email)
+      else
+        report_lookup_failure(email, e.message)
+        nil
+      end
+    end
+
+    private def report_lookup_failure(email, error_message)
       admin_send(
         "Slack user lookup by email for #{email} failed with " \
-        "error: #{e.message}"
+        "error: #{error_message}"
       )
-      nil
+    end
+
+    private def alias_list
+      @alias_list ||= config.slack_alias_table && SlackAliasList.new(config)
     end
 
     # If the app token starts with xoxb- then it is a Bot User Oauth token
