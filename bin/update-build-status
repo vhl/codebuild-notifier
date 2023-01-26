@@ -129,7 +129,7 @@ OptionParser.new do |opts|
 end.parse!
 # rubocop:enable Metrics/BlockLength
 
-config = CodeBuildNotifier::Config.new(command_line_opts)
+config = CodeBuildNotifier::Config.new(**command_line_opts)
 build = CodeBuildNotifier::CurrentBuild.new
 history = CodeBuildNotifier::BuildHistory.new(config, build)
 last_build = history.last_entry

@@ -42,6 +42,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'aws-sdk-dynamodb', '~> 1.16'
   spec.add_dependency 'aws-sdk-secretsmanager', '~> 1.19'
   spec.add_dependency 'hashie', '> 1.0', '< 4.0'
+  spec.add_dependency 'nokogiri'
   spec.add_dependency 'slack-ruby-client', '~> 0.13'
 
   spec.add_development_dependency 'rspec', '~> 3.8'
